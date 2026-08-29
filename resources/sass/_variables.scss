@@ -1,0 +1,11 @@
+// Bootstrap variable overrides.
+//
+// Kept intentionally minimal for now — the HRIS blueprint calls for a
+// minimalist, clean white theme with light/dark/system modes, which
+// Bootstrap 5.3's defaults already provide. Add brand-specific overrides
+// here as design decisions are made, rather than guessing a palette now.
+
+$font-family-sans-serif: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+$sidebar-width: 260px;
+$sidebar-width-collapsed: 72px;
