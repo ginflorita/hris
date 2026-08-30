@@ -23,8 +23,8 @@ on any module; this file only summarizes conventions and status.
   `App\Models\Role` subclass (see Authorization below), not the package's
   own views (it doesn't ship any) or its teams feature
 
-No starter kit (Breeze/Jetstream) is installed. Organization and
-everything past RBAC is unbuilt — see Status below.
+No starter kit (Breeze/Jetstream) is installed. Employee records and
+everything past Organization is unbuilt — see Status below.
 
 ## Architecture
 
@@ -92,8 +92,13 @@ non-negotiable — don't relax these for convenience):
   Superadmin protection + mandatory MFA (§30, now enforced), a `data_scope`
   concept on every role (§34) whose *enforcement* mostly waits on Phase 5/6,
   and admin UI for Users/Roles/Permissions. See Authorization below.
+- Phase 5 — Organization: the Company → Division → Department → Section →
+  Team hierarchy plus Positions/Job Levels/Job Grades/Cost Centers, full
+  admin CRUD UI wired into the sidebar (WORKFORCE > Organization/
+  Positions), gated by `organization.view`/`organization.manage`. See
+  Organization below before touching any of this.
 
-**Not started:** Phase 5 (Organization) onward, through Phase 18. Follow
+**Not started:** Phase 6 (Employee) onward, through Phase 18. Follow
 the phase order in blueprint §54/§59; don't jump ahead to a later phase's
 tables/UI before its dependencies exist. Re-read the relevant blueprint
 section before starting a phase — this file is a summary, not a
@@ -185,7 +190,9 @@ per permission grant — in practice a role's permissions share one reach,
 and one column per role is far simpler to query than a scope on every row
 of `role_has_permissions`. The seeded roles all have a real value (see
 `RoleAndPermissionSeeder::ROLES`), but nothing queries it yet — Phase 5
-(Organization) and Phase 6 (Employee) don't exist yet to scope against.
+(Organization) gives the hierarchy to scope *against*, but nothing to scope
+*by*: that needs Phase 6 (Employee), since scoping means filtering records
+by the acting user's own position in the org chart.
 When a Domain model needs it: resolve the acting user's effective scope
 as the *broadest* among their roles for that permission (a user with both
 a Team-scoped and a Company-scoped role gets Company for actions either
@@ -203,6 +210,92 @@ sets them (`DatabaseSeeder`) goes through a factory, which bypasses
 `$fillable` entirely, so they don't need to be, and leaving them off means
 no stray `$user->update($request->all())` can ever grant Superadmin-style
 protection to an arbitrary account.
+
+## Organization
+
+The hierarchy is `Company → Division → Department → Section → Team`, plus
+`Branch` (also directly under Company) and the lookup entities `Position`,
+`JobLevel`, `JobGrade`, `CostCenter`. Migrations: `2026_08_30_170001` through
+`_170006` for the hierarchy, `_170101` through `_170104` for the lookups —
+sequential on purpose, since `make:migration` giving several tables the same
+timestamp sorts them alphabetically as a tiebreaker, which can put a child
+table before the parent it has a foreign key to.
+
+**Every level below Company carries its own direct `company_id`, not just a
+link to its immediate parent.** Division/Department/Section/Team/Position/
+JobLevel/JobGrade/CostCenter all have a nullable immediate-parent id
+(`division_id`, `department_id`, `section_id`, `job_level_id`, ...) *and* a
+required `company_id`. This is a deliberate deviation from a strict
+5-level-chain-only model: it keeps `Employee::company_id` (Phase 6) a simple
+direct column instead of a recursive walk up the chain, and it's what makes
+the per-company scoping below possible without joining through every
+intermediate level. A record's immediate-parent, when set, must belong to
+the same `company_id` — enforced in every controller's validation via
+`Rule::exists(...)->where('company_id', ...)`, not at the database level.
+
+**Code uniqueness is scoped per company, not global** — two companies can
+both have a `division` with code `HR`. Every controller enforces this with
+`Rule::unique(...)->where('company_id', ...)->ignore($model?->id)`, backed
+by a matching `unique(['company_id', 'code'])` composite index at the
+migration level on every table below Company (Company itself has no
+parent to scope by, so its `code` is globally unique instead).
+
+**Deleting is blocked while children exist**, checked in each
+`destroy()` before the (soft) delete — e.g. `CompanyController::destroy()`
+checks 9 relations, `DivisionController::destroy()` checks `departments()`,
+`JobLevelController::destroy()`/`JobGradeController::destroy()` check
+`positions()`. `Team` and `Position` are leaves with nothing to check.
+This is an application-level integrity rule on top of (not a replacement
+for) the soft-delete + `nullOnDelete()` FK behavior — soft deletes don't
+trigger `nullOnDelete`, so without this check a UI could hide a record
+while other rows still silently pointed at it.
+
+**The `is_active` checkbox default is context-sensitive — this exact
+pattern is repeated in every controller in `app/Http/Controllers/Admin/`
+for this module:** `$request->boolean('is_active', $model === null)`. An
+unchecked HTML checkbox submits no field at all, so `'sometimes'` in the
+validation rules would leave `is_active` untouched on update instead of
+turning it off; reading it explicitly outside validation fixes that, but
+then needs a fallback that differs by direction — absent means "use the
+default" (true) on create, but "the box was there and got unchecked"
+(false) on update.
+
+**Route parameter names for the four kebab-case resources are
+underscored, not hyphenated:** `Route::resource('job-levels', ...)`
+produces `{job_level}` in the URI (Laravel dashes the URI segment but
+underscores the wildcard), so `JobLevelController::update(Request
+$request, JobLevel $jobLevel)` still resolves correctly via implicit
+binding (Laravel snake-cases the parameter name before matching) —
+but if you ever need to reference the raw route parameter yourself,
+it's `job_level`/`job_grade`/`cost_center`, not `job-level`/etc.
+
+Admin UI lives at `resources/views/admin/organization/*`, one directory
+per entity, each with `_form-fields.blade.php` (shared between
+create/edit) plus `index`/`create`/`edit`. `<x-admin.resource-index>`
+(`resources/views/components/admin/resource-index.blade.php`) is the
+shared list-page chrome (create button, flash/error alert, table shell)
+used by every `index.blade.php` in the app, not just Organization.
+`<x-admin.org-subnav>` is Organization-specific: a 10-item pill row
+included at the top of every one of this module's index pages, since the
+sidebar collapses all ten entities into two nav items (see below) and
+the subnav is how the other eight stay reachable.
+
+Sidebar wiring (`resources/views/layouts/partials/sidebar.blade.php`):
+WORKFORCE > **Organization** links to Companies and stays highlighted
+across all six hierarchy pages; WORKFORCE > **Positions** links to
+Positions and stays highlighted across all four lookup pages. Both use
+an `'active' => [...]` config entry (a list of `routeIs()` patterns)
+rather than the single-route default the other nav items use — that's
+what makes e.g. the Departments page still show "Organization" as
+active instead of nothing being highlighted.
+
+**No seeded role has `organization.manage`** — only `organization.view`
+(HR Administrator, HR Staff). Superadmin can still create/edit/delete via
+the `Gate::before()` bypass; any other role needs `organization.manage`
+granted explicitly through the Phase 4 Roles UI before it can manage
+organization data. This isn't a bug to fix here — it's the same
+"permission exists, nothing's granted it by default yet" pattern the rest
+of the seeder follows.
 
 ## Commands
 

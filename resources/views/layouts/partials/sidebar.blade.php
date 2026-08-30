@@ -1,7 +1,8 @@
 {{--
     Mostly still static placeholders — most modules aren't built yet (see
-    CLAUDE.md "Status"). ADMINISTRATION > Users/Roles is real and
-    permission-gated; the rest light up the same way as their phase lands.
+    CLAUDE.md "Status"). WORKFORCE > Organization/Positions and
+    ADMINISTRATION > Users/Roles/Permissions are real and permission-gated;
+    the rest light up the same way as their phase lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -19,7 +20,21 @@
         </ul>
 
         @foreach ([
-            'WORKFORCE' => ['Employees', 'Organization', 'Positions', 'Employment', 'Documents'],
+            'WORKFORCE' => [
+                'Employees' => null,
+                'Organization' => [
+                    'route' => 'admin.organization.companies.index',
+                    'can' => ['organization.view'],
+                    'active' => ['admin.organization.companies.*', 'admin.organization.branches.*', 'admin.organization.divisions.*', 'admin.organization.departments.*', 'admin.organization.sections.*', 'admin.organization.teams.*'],
+                ],
+                'Positions' => [
+                    'route' => 'admin.organization.positions.index',
+                    'can' => ['organization.view'],
+                    'active' => ['admin.organization.positions.*', 'admin.organization.job-levels.*', 'admin.organization.job-grades.*', 'admin.organization.cost-centers.*'],
+                ],
+                'Employment' => null,
+                'Documents' => null,
+            ],
             'TIME & ATTENDANCE' => ['Attendance', 'Schedules', 'Shifts', 'Overtime', 'Holidays', 'Leave'],
             'PAYROLL' => ['Payroll', 'Payroll Periods', 'Compensation', 'Benefits', 'Payslips'],
             'TALENT' => ['Recruitment', 'Applicants', 'Onboarding', 'Performance', 'Training', 'Skills', 'Career'],
@@ -42,7 +57,7 @@
                     @php($label = is_int($label) ? $item : $label)
                     <li class="nav-item">
                         @if ($config && Route::has($config['route']) && auth()->user()?->can(...$config['can']))
-                            <a class="nav-link {{ request()->routeIs($config['route'].'*') ? 'active' : '' }}"
+                            <a class="nav-link {{ request()->routeIs(...($config['active'] ?? [$config['route'].'*'])) ? 'active' : '' }}"
                                href="{{ route($config['route']) }}">{{ $label }}</a>
                         @else
                             <span class="nav-link disabled text-body-secondary" aria-disabled="true">{{ $label }}</span>
