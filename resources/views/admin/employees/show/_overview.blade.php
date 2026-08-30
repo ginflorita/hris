@@ -1,4 +1,5 @@
 @php($current = $employee->employments->firstWhere('end_date', null))
+@php($currentSchedule = $employee->employeeSchedules->firstWhere('end_date', null))
 @php($rows = [
     'Full name' => $employee->full_name,
     'Preferred name' => $employee->preferred_name,
@@ -52,4 +53,62 @@
             </div>
         </div>
     </div>
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Current schedule
+                @can('employees.update')
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignScheduleModal">Assign</button>
+                @endcan
+            </div>
+            <div class="card-body">
+                @if ($currentSchedule)
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Schedule</dt>
+                        <dd class="col-sm-7">{{ $currentSchedule->schedule->name }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Type</dt>
+                        <dd class="col-sm-7">{{ ucfirst($currentSchedule->schedule->type->value) }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Since</dt>
+                        <dd class="col-sm-7">{{ $currentSchedule->effective_date->format('M d, Y') }}</dd>
+                    </dl>
+                @else
+                    <p class="text-body-secondary mb-0">No schedule assigned.</p>
+                @endif
+            </div>
+        </div>
+    </div>
 </div>
+
+@can('employees.update')
+    <div class="modal fade" id="assignScheduleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('admin.employees.schedules.store', $employee) }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Assign schedule</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Schedule</label>
+                            <select name="schedule_id" class="form-select" required>
+                                @foreach ($schedules as $scheduleOption)
+                                    <option value="{{ $scheduleOption->id }}">{{ $scheduleOption->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Effective date</label>
+                            <input type="date" name="effective_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endcan

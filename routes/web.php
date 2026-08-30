@@ -11,3 +11,4 @@ require __DIR__.'/auth.php';
 require __DIR__.'/admin.php';
 require __DIR__.'/organization.php';
 require __DIR__.'/employees.php';
+require __DIR__.'/attendance.php';

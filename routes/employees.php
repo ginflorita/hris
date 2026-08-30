@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmployeeDocumentController;
 use App\Http\Controllers\Admin\EmployeeEmergencyContactController;
 use App\Http\Controllers\Admin\EmployeeGovernmentIdController;
 use App\Http\Controllers\Admin\EmployeeNoteController;
+use App\Http\Controllers\Admin\EmployeeScheduleController;
 use App\Http\Controllers\Admin\EmploymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -48,5 +49,6 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::delete('notes/{note}', [EmployeeNoteController::class, 'destroy'])->name('notes.destroy');
 
             Route::post('employments', [EmploymentController::class, 'store'])->name('employments.store');
+            Route::post('schedules', [EmployeeScheduleController::class, 'store'])->name('schedules.store');
         });
     });

@@ -92,4 +92,24 @@ class Employee extends Model
     {
         return $this->hasOne(Employment::class)->whereNull('end_date');
     }
+
+    public function employeeSchedules(): HasMany
+    {
+        return $this->hasMany(EmployeeSchedule::class)->orderByDesc('effective_date');
+    }
+
+    public function currentSchedule(): HasOne
+    {
+        return $this->hasOne(EmployeeSchedule::class)->whereNull('end_date');
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function overtimeRequests(): HasMany
+    {
+        return $this->hasMany(OvertimeRequest::class);
+    }
 }

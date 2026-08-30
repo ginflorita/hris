@@ -71,7 +71,11 @@
                         <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
-                        <td>8–18 — Attendance through Production</td>
+                        <td>8 — Attendance &amp; Scheduling</td>
+                        <td><span class="badge text-bg-success">Done</span></td>
+                    </tr>
+                    <tr>
+                        <td>9–18 — Leave through Production</td>
                         <td><span class="badge text-bg-secondary">Not started</span></td>
                     </tr>
                 </tbody>

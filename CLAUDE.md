@@ -109,12 +109,20 @@ non-negotiable — don't relax these for convenience):
   regularization/separation, surfaced as an Employment History tab on
   the same profile page. See Employment below — this is what finally
   closes the Team/Department/Branch data-scope loop mentioned above.
+- Phase 8 — Attendance & Scheduling: Holidays, Shifts, Schedules (plus
+  effective-dated `employee_schedules` assignment), Attendance (manual
+  entry + audit-logged corrections, gated by a separate
+  `attendance.correct` permission from `attendance.manage`), Overtime
+  requests with approve/reject, and a filterable attendance summary
+  report. Direct approve/reject rather than routing through a generic
+  workflow engine — Workflow (blueprint module 27/48) is a later,
+  not-yet-built module. See Attendance below.
 
-**Not started:** Phase 8 (Attendance & Scheduling) onward, through Phase
-18. Follow the phase order in blueprint §54/§59; don't jump ahead to a
-later phase's tables/UI before its dependencies exist. Re-read the
-relevant blueprint section before starting a phase — this file is a
-summary, not a substitute.
+**Not started:** Phase 9 (Leave Management) onward, through Phase 18.
+Follow the phase order in blueprint §54/§59; don't jump ahead to a later
+phase's tables/UI before its dependencies exist. Re-read the relevant
+blueprint section before starting a phase — this file is a summary, not
+a substitute.
 
 ## Authentication
 
@@ -400,6 +408,63 @@ field here, since an employee's company is fixed by their `employees`
 row, not chosen per employment change. `manager_id` additionally rejects
 an employee being their own manager, checked in the controller (not a
 validation rule) since it needs the route's `$employee` for comparison.
+
+## Attendance
+
+Six entities under one module: `Holiday`, `Shift`, `Schedule` (company-
+scoped CRUD, same pattern as Organization) plus `EmployeeSchedule`
+(effective-dated, append-only assignment — identical shape to
+`Employment`: `EmployeeScheduleController::store()` closes the prior
+current row before inserting the new one), `Attendance` (one row per
+employee per day), and `OvertimeRequest` (submit → approve/reject).
+`<x-admin.attendance-subnav>` cross-links all six index pages the same
+way `<x-admin.org-subnav>` does for Organization.
+
+**`Attendance` is corrected in place, not appended — the one exception
+to the effective-dated pattern used everywhere else in this app**, because
+the unique constraint is `(employee_id, date)`: there's only one row an
+employee can have for a given day, so there's nothing to append a new
+row *to*. Instead, every correction is required to log the old/new value
+of each changed field to `attendance_correction_logs` (with a reason and
+who made it) *before* the row itself is updated — see
+`AttendanceController::update()`. This is still "never overwrite
+silently," just implemented differently than `Employment`'s "insert a
+new row" because the data shape doesn't support that here. Corrections
+require the separate `attendance.correct` permission, not
+`attendance.manage` — a role can manage shift/schedule setup without
+being able to alter recorded attendance, or vice versa.
+
+**`late_minutes`/`undertime_minutes` are computed against the
+employee's `currentSchedule->schedule->shift`** (start/end time +
+grace_minutes) in `AttendanceController::computeMinutes()`, both on
+manual entry and on every correction (so correcting a time recalculates
+these rather than leaving stale values). If the employee has no current
+schedule or shift, both are `0` — there's nothing to compare against.
+One Carbon gotcha worth remembering here: **`diffInMinutes()` returns a
+*signed* difference in Carbon 3** (unlike Carbon 2's always-absolute
+default), so a naive `$timeIn->diffInMinutes($shiftStart)` comes back
+negative when `$timeIn` is after `$shiftStart` — pass `true` for the
+`$absolute` argument, as `computeMinutes()` does.
+
+**Every `date`-typed column that's ever compared via `Rule::unique()`
+uses an explicit `'date:Y-m-d'` cast, not the bare `'date'` cast** —
+`Holiday`, `Attendance`, `OvertimeRequest` all do this. The bare `'date'`
+cast reads back as a Carbon date but *writes* using the query grammar's
+full `'Y-m-d H:i:s'` format, so a `Rule::unique()` check comparing raw
+`'2026-01-01'` request input against a stored `'2026-01-01 00:00:00'`
+silently never matches — a real bug caught by
+`HolidayShiftScheduleTest::test_holiday_crud_and_date_uniqueness_per_company`
+(it let a duplicate through validation, which the
+database's own unique index then rejected as an unhandled exception
+instead of a friendly form error). Match this cast whenever a new
+date column needs uniqueness or exact-value validation.
+
+**No generic workflow engine yet** — Overtime approve/reject are plain
+`PUT` actions gated by `attendance.manage`, not routed through a
+workflow_definitions-style engine (blueprint module 27/48, a later,
+not-yet-built module). Don't build a bespoke approval chain here either;
+when Workflow lands, this is a candidate to migrate onto it, not to
+extend further with more ad-hoc states.
 
 ## Commands
 

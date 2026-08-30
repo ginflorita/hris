@@ -1,6 +1,7 @@
 {{--
     Mostly still static placeholders — most modules aren't built yet (see
-    CLAUDE.md "Status"). WORKFORCE > Organization/Positions and
+    CLAUDE.md "Status"). WORKFORCE > Employees/Organization/Positions,
+    TIME & ATTENDANCE > Attendance/Schedules/Shifts/Overtime/Holidays, and
     ADMINISTRATION > Users/Roles/Permissions are real and permission-gated;
     the rest light up the same way as their phase lands.
 --}}
@@ -35,7 +36,14 @@
                 'Employment' => null,
                 'Documents' => null,
             ],
-            'TIME & ATTENDANCE' => ['Attendance', 'Schedules', 'Shifts', 'Overtime', 'Holidays', 'Leave'],
+            'TIME & ATTENDANCE' => [
+                'Attendance' => ['route' => 'admin.attendance.attendances.index', 'can' => ['attendance.view']],
+                'Schedules' => ['route' => 'admin.attendance.schedules.index', 'can' => ['attendance.view']],
+                'Shifts' => ['route' => 'admin.attendance.shifts.index', 'can' => ['attendance.view']],
+                'Overtime' => ['route' => 'admin.attendance.overtime.index', 'can' => ['attendance.view']],
+                'Holidays' => ['route' => 'admin.attendance.holidays.index', 'can' => ['attendance.view']],
+                'Leave' => null,
+            ],
             'PAYROLL' => ['Payroll', 'Payroll Periods', 'Compensation', 'Benefits', 'Payslips'],
             'TALENT' => ['Recruitment', 'Applicants', 'Onboarding', 'Performance', 'Training', 'Skills', 'Career'],
             'REPORTS' => ['HR Reports', 'Attendance Reports', 'Leave Reports', 'Payroll Reports', 'Analytics'],
