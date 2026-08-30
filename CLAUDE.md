@@ -93,15 +93,22 @@ non-negotiable — don't relax these for convenience):
   concept on every role (§34) whose *enforcement* mostly waits on Phase 5/6,
   and admin UI for Users/Roles/Permissions. See Authorization below.
 - Phase 5 — Organization: the Company → Division → Department → Section →
-  Team hierarchy plus Positions/Job Levels/Job Grades/Cost Centers, full
-  admin CRUD UI wired into the sidebar (WORKFORCE > Organization/
-  Positions), gated by `organization.view`/`organization.manage`. See
-  Organization below before touching any of this.
+  Team hierarchy plus Branch/Location and Positions/Job Levels/Job
+  Grades/Cost Centers, full admin CRUD UI wired into the sidebar
+  (WORKFORCE > Organization/Positions), gated by
+  `organization.view`/`organization.manage`. See Organization below
+  before touching any of this.
+- Phase 6 — Employee Core HR: the `employees` master record (personal/
+  biographical data only — no job/position assignment yet, see Employee
+  below for why) plus addresses, contacts, emergency contacts, government
+  IDs, dependents, documents, and notes, all managed from one tabbed
+  profile page. Gated by `employees.view`/`employees.create`/
+  `employees.update`/`employees.archive`. See Employee below.
 
-**Not started:** Phase 6 (Employee) onward, through Phase 18. Follow
-the phase order in blueprint §54/§59; don't jump ahead to a later phase's
-tables/UI before its dependencies exist. Re-read the relevant blueprint
-section before starting a phase — this file is a summary, not a
+**Not started:** Phase 7 (Employee Lifecycle) onward, through Phase 18.
+Follow the phase order in blueprint §54/§59; don't jump ahead to a later
+phase's tables/UI before its dependencies exist. Re-read the relevant
+blueprint section before starting a phase — this file is a summary, not a
 substitute.
 
 ## Authentication
@@ -190,9 +197,11 @@ per permission grant — in practice a role's permissions share one reach,
 and one column per role is far simpler to query than a scope on every row
 of `role_has_permissions`. The seeded roles all have a real value (see
 `RoleAndPermissionSeeder::ROLES`), but nothing queries it yet — Phase 5
-(Organization) gives the hierarchy to scope *against*, but nothing to scope
-*by*: that needs Phase 6 (Employee), since scoping means filtering records
-by the acting user's own position in the org chart.
+(Organization) gives the hierarchy to scope *against*; Phase 6 (Employee)
+gives Company-level scope something concrete to filter (every employee
+carries `company_id`), but Team/Department/Branch-level scope still
+needs Phase 7 (Employment), since only that table will record *where* an
+employee currently sits in the org chart.
 When a Domain model needs it: resolve the acting user's effective scope
 as the *broadest* among their roles for that permission (a user with both
 a Team-scoped and a Company-scoped role gets Company for actions either
@@ -297,6 +306,60 @@ granted explicitly through the Phase 4 Roles UI before it can manage
 organization data. This isn't a bug to fix here — it's the same
 "permission exists, nothing's granted it by default yet" pattern the rest
 of the seeder follows.
+
+## Employee
+
+`App\Models\Employee` is deliberately bio-data only — no `department_id`,
+`position_id`, `branch_id`, or salary on the model itself. Blueprint §54
+splits this across two phases on purpose: Phase 6 (this one) is "Employee
+Core HR" (the person), Phase 7 "Employee Lifecycle" owns Employment as
+its own effective-dated table (hire date, position, department, manager,
+salary, status) so promotions/transfers/raises become new rows instead of
+overwriting history (CLAUDE.md's "never overwrite historical employment
+data" rule, non-negotiable). Don't add a "current department" convenience
+column to Employee before Phase 7 exists to populate it correctly.
+
+`Employee::company_id` is still direct and required, same as every
+Organization entity — it's what makes Company-level data scope (§34)
+enforceable starting now; Team/Department/Branch-level scope still needs
+Phase 7's Employment table to know *where* in the org chart an employee
+currently sits.
+
+**Archiving, not soft-deleting, is the employee-facing lifecycle action**
+(blueprint's CRUD list: "Create, Read, Update, Archive, Restore"). Mirrors
+`users.disabled_at` from Phase 3: `employees.archived_at` toggled by
+`archive()`/`restore()` in `EmployeeController`, both gated by the same
+`employees.archive` permission. `SoftDeletes` is still on the model too,
+but that's the Superadmin-only "undo an accidental create" escape hatch,
+not a user-facing action — nothing in the UI exposes a delete/trash flow.
+
+**Seven related tables, one profile page.** Addresses, contacts,
+emergency contacts, government IDs, dependents, documents, and notes each
+have their own model + nested controller
+(`app/Http/Controllers/Admin/Employee*Controller.php`, routes in
+`routes/employees.php` under `admin.employees.{addresses,contacts,...}`)
+but no index/create/edit views of their own — they're managed entirely
+from Bootstrap modals on `admin.employees.show`
+(`resources/views/admin/employees/show/_*.blade.php`, one tab per
+entity). Every nested controller checks
+`$subResource->employee_id === $employee->id` before acting (404 if not)
+since the sub-resource's own route-model-bound ID doesn't otherwise
+guarantee it belongs to the `{employee}` in the URL.
+
+**Addresses/contacts/emergency contacts have an `is_primary` flag that's
+kept exclusive per employee** — saving one as primary un-sets it on the
+others of that same type, done inside a `DB::transaction()` in each
+controller's private `save()` helper (see
+`EmployeeAddressController::save()` for the pattern). Government IDs,
+dependents, documents, and notes don't have this concept.
+
+**Employee documents are stored on the `local` disk, not `public`** —
+`Storage::disk('local')` under `storage/app/private/employee-documents/
+{employee_id}/`, deliberately not web-accessible by URL. Downloads go
+through an authenticated `EmployeeDocumentController::download()` action
+that checks `employees.view` before streaming the file, the same
+object-level-access spirit as the payslip-ownership rule this file
+already calls out as most worth protecting.
 
 ## Commands
 

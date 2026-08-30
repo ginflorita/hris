@@ -10,3 +10,4 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])->group(function ()
 require __DIR__.'/auth.php';
 require __DIR__.'/admin.php';
 require __DIR__.'/organization.php';
+require __DIR__.'/employees.php';

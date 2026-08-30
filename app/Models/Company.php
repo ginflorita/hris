@@ -69,4 +69,9 @@ class Company extends Model
     {
         return $this->hasMany(CostCenter::class);
     }
+
+    public function employees(): HasMany
+    {
+        return $this->hasMany(Employee::class);
+    }
 }

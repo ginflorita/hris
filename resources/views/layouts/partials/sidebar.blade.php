@@ -21,7 +21,7 @@
 
         @foreach ([
             'WORKFORCE' => [
-                'Employees' => null,
+                'Employees' => ['route' => 'admin.employees.index', 'can' => ['employees.view']],
                 'Organization' => [
                     'route' => 'admin.organization.companies.index',
                     'can' => ['organization.view'],

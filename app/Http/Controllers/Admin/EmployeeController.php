@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Enums\CivilStatus;
+use App\Enums\Gender;
+use App\Http\Controllers\Controller;
+use App\Models\Company;
+use App\Models\Employee;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+class EmployeeController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $this->authorize('employees.view');
+
+        $query = Employee::with('company')->orderBy('last_name')->orderBy('first_name');
+
+        if (! $request->boolean('with_archived')) {
+            $query->whereNull('archived_at');
+        }
+
+        if ($search = $request->string('q')->trim()->toString()) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('employee_number', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        return view('admin.employees.index', [
+            'employees' => $query->paginate(20)->withQueryString(),
+            'q' => $search,
+            'withArchived' => $request->boolean('with_archived'),
+        ]);
+    }
+
+    public function create(): View
+    {
+        $this->authorize('employees.create');
+
+        return view('admin.employees.create', ['companies' => $this->companies()]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $this->authorize('employees.create');
+
+        $employee = Employee::create($this->validated($request));
+
+        return redirect()->route('admin.employees.show', $employee)->with('status', 'Employee created.');
+    }
+
+    public function show(Employee $employee): View
+    {
+        $this->authorize('employees.view');
+
+        $employee->load(['company', 'addresses', 'contacts', 'emergencyContacts', 'governmentIds', 'dependents', 'documents.uploadedBy', 'notes.createdBy']);
+
+        return view('admin.employees.show', ['employee' => $employee]);
+    }
+
+    public function edit(Employee $employee): View
+    {
+        $this->authorize('employees.update');
+
+        return view('admin.employees.edit', ['employee' => $employee, 'companies' => $this->companies()]);
+    }
+
+    public function update(Request $request, Employee $employee): RedirectResponse
+    {
+        $this->authorize('employees.update');
+
+        $employee->update($this->validated($request, $employee));
+
+        return redirect()->route('admin.employees.show', $employee)->with('status', 'Employee updated.');
+    }
+
+    public function archive(Employee $employee): RedirectResponse
+    {
+        $this->authorize('employees.archive');
+
+        $employee->update(['archived_at' => now()]);
+
+        return back()->with('status', 'Employee archived.');
+    }
+
+    public function restore(Employee $employee): RedirectResponse
+    {
+        $this->authorize('employees.archive');
+
+        $employee->update(['archived_at' => null]);
+
+        return back()->with('status', 'Employee restored.');
+    }
+
+    /**
+     * @return Collection<int, Company>
+     */
+    private function companies(): Collection
+    {
+        return Company::orderBy('name')->get();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validated(Request $request, ?Employee $employee = null): array
+    {
+        return $request->validate([
+            'company_id' => ['required', 'exists:companies,id'],
+            'employee_number' => [
+                'required', 'string', 'max:50',
+                Rule::unique('employees', 'employee_number')->where('company_id', $request->input('company_id'))->ignore($employee?->id),
+            ],
+            'first_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'suffix' => ['nullable', 'string', 'max:20'],
+            'preferred_name' => ['nullable', 'string', 'max:255'],
+            'birth_date' => ['nullable', 'date', 'before:today'],
+            'gender' => ['nullable', Rule::enum(Gender::class)],
+            'civil_status' => ['nullable', Rule::enum(CivilStatus::class)],
+            'nationality' => ['nullable', 'string', 'max:255'],
+            'email' => [
+                'nullable', 'email', 'max:255',
+                Rule::unique('employees', 'email')->where('company_id', $request->input('company_id'))->ignore($employee?->id),
+            ],
+            'mobile' => ['nullable', 'string', 'max:50'],
+        ]);
+    }
+}
