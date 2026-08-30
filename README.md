@@ -54,11 +54,13 @@ Phase 1 (project foundation), part of Phase 2 (UI shell), Phase 3
 (authentication — login, 2FA, password reset, sessions), Phase 4
 (RBAC — roles, permissions, Superadmin protection, user management),
 Phase 5 (Organization — company/division/department/section/team
-hierarchy, positions, job levels/grades, cost centers), and Phase 6
+hierarchy, positions, job levels/grades, cost centers), Phase 6
 (Employee Core HR — employee master data, addresses, contacts, emergency
-contacts, government IDs, dependents, documents, notes) are in place —
-see the dashboard's build-status panel or `CLAUDE.md` for what's done and
-what's next. The system is built in phases per
+contacts, government IDs, dependents, documents, notes), and Phase 7
+(Employee Lifecycle — an append-only Employment History covering hire,
+promotion, transfer, salary changes, regularization, and separation) are
+in place — see the dashboard's build-status panel or `CLAUDE.md` for
+what's done and what's next. The system is built in phases per
 [`docs/HRIS_Blueprint.md` §54](docs/HRIS_Blueprint.md#54-development-phases);
 modules are not built out of order.
 

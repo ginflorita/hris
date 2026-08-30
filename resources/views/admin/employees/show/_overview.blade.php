@@ -1,3 +1,4 @@
+@php($current = $employee->employments->firstWhere('end_date', null))
 @php($rows = [
     'Full name' => $employee->full_name,
     'Preferred name' => $employee->preferred_name,
@@ -10,13 +11,45 @@
     'Company' => $employee->company->name,
 ])
 
-<div class="card" style="max-width: 640px;">
-    <div class="card-body">
-        <dl class="row mb-0">
-            @foreach ($rows as $label => $value)
-                <dt class="col-sm-4 text-body-secondary fw-normal">{{ $label }}</dt>
-                <dd class="col-sm-8">{{ $value ?? '—' }}</dd>
-            @endforeach
-        </dl>
+<div class="row g-3">
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Personal</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    @foreach ($rows as $label => $value)
+                        <dt class="col-sm-5 text-body-secondary fw-normal">{{ $label }}</dt>
+                        <dd class="col-sm-7">{{ $value ?? '—' }}</dd>
+                    @endforeach
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Current employment</div>
+            <div class="card-body">
+                @if ($current)
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Position</dt>
+                        <dd class="col-sm-7">{{ $current->position?->title ?? '—' }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Department</dt>
+                        <dd class="col-sm-7">{{ $current->department?->name ?? '—' }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Branch</dt>
+                        <dd class="col-sm-7">{{ $current->branch?->name ?? '—' }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Manager</dt>
+                        <dd class="col-sm-7">{{ $current->manager?->full_name ?? '—' }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Employment type</dt>
+                        <dd class="col-sm-7">{{ ucwords(str_replace('_', ' ', $current->employment_type->value)) }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Status</dt>
+                        <dd class="col-sm-7">{{ ucwords(str_replace('_', ' ', $current->status->value)) }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Since</dt>
+                        <dd class="col-sm-7">{{ $current->effective_date->format('M d, Y') }}</dd>
+                    </dl>
+                @else
+                    <p class="text-body-secondary mb-0">No employment record yet. Use the Employment History tab to record a hire.</p>
+                @endif
+            </div>
+        </div>
     </div>
 </div>

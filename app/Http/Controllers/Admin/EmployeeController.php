@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\CivilStatus;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Location;
+use App\Models\Position;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,9 +65,20 @@ class EmployeeController extends Controller
     {
         $this->authorize('employees.view');
 
-        $employee->load(['company', 'addresses', 'contacts', 'emergencyContacts', 'governmentIds', 'dependents', 'documents.uploadedBy', 'notes.createdBy']);
+        $employee->load([
+            'company', 'addresses', 'contacts', 'emergencyContacts', 'governmentIds', 'dependents',
+            'documents.uploadedBy', 'notes.createdBy',
+            'employments' => fn ($q) => $q->with(['department', 'position', 'branch', 'location', 'manager']),
+        ]);
 
-        return view('admin.employees.show', ['employee' => $employee]);
+        return view('admin.employees.show', [
+            'employee' => $employee,
+            'departments' => Department::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'positions' => Position::where('company_id', $employee->company_id)->orderBy('title')->get(),
+            'branches' => Branch::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'locations' => Location::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'managers' => Employee::where('company_id', $employee->company_id)->where('id', '!=', $employee->id)->orderBy('last_name')->get(),
+        ]);
     }
 
     public function edit(Employee $employee): View

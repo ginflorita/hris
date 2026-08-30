@@ -104,12 +104,17 @@ non-negotiable — don't relax these for convenience):
   IDs, dependents, documents, and notes, all managed from one tabbed
   profile page. Gated by `employees.view`/`employees.create`/
   `employees.update`/`employees.archive`. See Employee below.
+- Phase 7 — Employee Lifecycle: `employments`, an append-only effective-
+  dated table covering hire/promotion/transfer/salary change/
+  regularization/separation, surfaced as an Employment History tab on
+  the same profile page. See Employment below — this is what finally
+  closes the Team/Department/Branch data-scope loop mentioned above.
 
-**Not started:** Phase 7 (Employee Lifecycle) onward, through Phase 18.
-Follow the phase order in blueprint §54/§59; don't jump ahead to a later
-phase's tables/UI before its dependencies exist. Re-read the relevant
-blueprint section before starting a phase — this file is a summary, not a
-substitute.
+**Not started:** Phase 8 (Attendance & Scheduling) onward, through Phase
+18. Follow the phase order in blueprint §54/§59; don't jump ahead to a
+later phase's tables/UI before its dependencies exist. Re-read the
+relevant blueprint section before starting a phase — this file is a
+summary, not a substitute.
 
 ## Authentication
 
@@ -197,11 +202,13 @@ per permission grant — in practice a role's permissions share one reach,
 and one column per role is far simpler to query than a scope on every row
 of `role_has_permissions`. The seeded roles all have a real value (see
 `RoleAndPermissionSeeder::ROLES`), but nothing queries it yet — Phase 5
-(Organization) gives the hierarchy to scope *against*; Phase 6 (Employee)
+(Organization) gives the hierarchy to scope *against*, Phase 6 (Employee)
 gives Company-level scope something concrete to filter (every employee
-carries `company_id`), but Team/Department/Branch-level scope still
-needs Phase 7 (Employment), since only that table will record *where* an
-employee currently sits in the org chart.
+carries `company_id`), and Phase 7 (Employment) is what actually records
+*where* an employee currently sits (their `currentEmployment`'s
+`department_id`/`branch_id`/manager chain) — the pieces now all exist,
+but no query anywhere resolves a role's `data_scope` and filters by it
+yet; that's still a real gap, not a false one.
 When a Domain model needs it: resolve the acting user's effective scope
 as the *broadest* among their roles for that permission (a user with both
 a Team-scoped and a Company-scoped role gets Company for actions either
@@ -360,6 +367,39 @@ through an authenticated `EmployeeDocumentController::download()` action
 that checks `employees.view` before streaming the file, the same
 object-level-access spirit as the payslip-ownership rule this file
 already calls out as most worth protecting.
+
+## Employment
+
+`Employment` (table `employments`) is the effective-dated record Employee
+deliberately doesn't carry (see Employee above). It is **append-only —
+there is no `update()`/`destroy()` on `EmploymentController`, only
+`store()`.** Every lifecycle event (hire, promotion, transfer, salary
+change, regularization, separation — `App\Enums\EmploymentChangeType`)
+inserts a new row; if a current row exists (`end_date IS NULL`),
+`EmploymentController::store()` closes it first by setting its
+`end_date` to the new row's `effective_date` minus one day, in the same
+`DB::transaction()`. This is the same "never overwrite, only append"
+principle as payroll immutability, applied one phase early because the
+blueprint's own Employment History example (§6) shows position and
+salary changing together as one timeline, not as separately-tracked
+fields.
+
+`Employee::currentEmployment` (a `hasOne` scoped to `whereNull('end_date')`)
+is how every other part of the app should ask "where does this employee
+work right now" — department, position, branch, location, manager,
+salary. Don't add a denormalized "current department" column to
+`Employee` as a shortcut; query through `currentEmployment` (or
+`employments()->latest('effective_date')` for history) instead, so
+there's exactly one source of truth for "current."
+
+`department_id`/`position_id`/`branch_id`/`location_id`/`manager_id` on
+an `Employment` row are all validated against the *employee's own*
+`company_id` (`Rule::exists(...)->where('company_id', $employee->company_id)`)
+— unlike Organization's controllers, the company itself isn't a form
+field here, since an employee's company is fixed by their `employees`
+row, not chosen per employment change. `manager_id` additionally rejects
+an employee being their own manager, checked in the controller (not a
+validation rule) since it needs the route's `$employee` for comparison.
 
 ## Commands
 

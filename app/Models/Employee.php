@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
@@ -80,5 +81,15 @@ class Employee extends Model
     public function notes(): HasMany
     {
         return $this->hasMany(EmployeeNote::class);
+    }
+
+    public function employments(): HasMany
+    {
+        return $this->hasMany(Employment::class)->orderByDesc('effective_date');
+    }
+
+    public function currentEmployment(): HasOne
+    {
+        return $this->hasOne(Employment::class)->whereNull('end_date');
     }
 }

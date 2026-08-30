@@ -57,6 +57,7 @@
     <ul class="nav nav-tabs mb-3" role="tablist">
         @foreach ([
             'overview' => 'Overview',
+            'employment' => 'Employment History',
             'addresses' => 'Addresses',
             'contacts' => 'Contacts',
             'emergency-contacts' => 'Emergency Contacts',
@@ -75,6 +76,9 @@
     <div class="tab-content">
         <div class="tab-pane fade show active" id="overview" role="tabpanel">
             @include('admin.employees.show._overview')
+        </div>
+        <div class="tab-pane fade" id="employment" role="tabpanel">
+            @include('admin.employees.show._employment')
         </div>
         <div class="tab-pane fade" id="addresses" role="tabpanel">
             @include('admin.employees.show._addresses')
