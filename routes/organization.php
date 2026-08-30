@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\JobGradeController;
 use App\Http\Controllers\Admin\JobLevelController;
+use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\PositionController;
 use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\TeamController;
@@ -16,6 +17,7 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
     ->prefix('admin/organization')->name('admin.organization.')->group(function () {
         Route::resource('companies', CompanyController::class)->except('show');
         Route::resource('branches', BranchController::class)->except('show');
+        Route::resource('locations', LocationController::class)->except('show');
         Route::resource('divisions', DivisionController::class)->except('show');
         Route::resource('departments', DepartmentController::class)->except('show');
         Route::resource('sections', SectionController::class)->except('show');

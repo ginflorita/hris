@@ -57,6 +57,7 @@ class CompanyController extends Controller
         $this->authorize('organization.manage');
 
         $hasChildren = $company->branches()->exists()
+            || $company->locations()->exists()
             || $company->divisions()->exists()
             || $company->departments()->exists()
             || $company->sections()->exists()

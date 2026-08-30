@@ -214,8 +214,9 @@ protection to an arbitrary account.
 ## Organization
 
 The hierarchy is `Company → Division → Department → Section → Team`, plus
-`Branch` (also directly under Company) and the lookup entities `Position`,
-`JobLevel`, `JobGrade`, `CostCenter`. Migrations: `2026_08_30_170001` through
+`Branch`/`Location` (also directly under Company; `Location` optionally
+belongs to a `Branch`) and the lookup entities `Position`, `JobLevel`,
+`JobGrade`, `CostCenter`. Migrations: `2026_08_30_170001` through
 `_170006` for the hierarchy, `_170101` through `_170104` for the lookups —
 sequential on purpose, since `make:migration` giving several tables the same
 timestamp sorts them alphabetically as a tiebreaker, which can put a child

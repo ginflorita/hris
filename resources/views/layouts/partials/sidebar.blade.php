@@ -25,7 +25,7 @@
                 'Organization' => [
                     'route' => 'admin.organization.companies.index',
                     'can' => ['organization.view'],
-                    'active' => ['admin.organization.companies.*', 'admin.organization.branches.*', 'admin.organization.divisions.*', 'admin.organization.departments.*', 'admin.organization.sections.*', 'admin.organization.teams.*'],
+                    'active' => ['admin.organization.companies.*', 'admin.organization.branches.*', 'admin.organization.locations.*', 'admin.organization.divisions.*', 'admin.organization.departments.*', 'admin.organization.sections.*', 'admin.organization.teams.*'],
                 ],
                 'Positions' => [
                     'route' => 'admin.organization.positions.index',

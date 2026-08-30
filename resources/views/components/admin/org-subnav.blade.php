@@ -4,6 +4,7 @@
     $items = [
         'companies' => 'Companies',
         'branches' => 'Branches',
+        'locations' => 'Locations',
         'divisions' => 'Divisions',
         'departments' => 'Departments',
         'sections' => 'Sections',

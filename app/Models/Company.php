@@ -25,6 +25,11 @@ class Company extends Model
         return $this->hasMany(Branch::class);
     }
 
+    public function locations(): HasMany
+    {
+        return $this->hasMany(Location::class);
+    }
+
     public function divisions(): HasMany
     {
         return $this->hasMany(Division::class);
