@@ -3,7 +3,7 @@
 use App\Http\Controllers\SecurityController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'auth.session'])->prefix('security')->name('security.')->group(function () {
+Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])->prefix('security')->name('security.')->group(function () {
     Route::get('/', [SecurityController::class, 'index'])->name('index');
 
     // Re-validates the current password inline, so it doesn't need the

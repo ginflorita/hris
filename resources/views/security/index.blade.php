@@ -5,6 +5,10 @@
 @php($breadcrumbs = [['label' => 'Security & Sessions']])
 
 @section('content')
+    @session('warning')
+        <div class="alert alert-warning py-2">{{ $value }}</div>
+    @endsession
+
     @session('status')
         <div class="alert alert-success py-2">
             @switch($value)

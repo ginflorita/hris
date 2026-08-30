@@ -3,19 +3,27 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\DefaultRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
+     *
+     * is_system_account/is_protected are deliberately NOT here — the one
+     * place that sets them (DatabaseSeeder) goes through a factory, which
+     * bypasses $fillable entirely, so they don't need to be. Keeping them
+     * off this list means a stray $user->update($request->all()) can
+     * never grant Superadmin-style protection to an arbitrary account.
      *
      * @var list<string>
      */
@@ -23,6 +31,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'disabled_at',
     ];
 
     /**
@@ -48,11 +57,18 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'disabled_at' => 'datetime',
+            'is_system_account' => 'boolean',
+            'is_protected' => 'boolean',
         ];
     }
 
     public function isDisabled(): bool
     {
         return ! is_null($this->disabled_at);
+    }
+
+    public function isSuperadmin(): bool
+    {
+        return $this->hasRole(DefaultRole::Superadmin->value);
     }
 }

@@ -101,7 +101,12 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // mfa.superadmin no-ops on guest routes (login, password reset) since
+    // it only acts when $request->user() is set; on the authenticated
+    // ones it's what makes the two-factor.*/password.confirm* entries in
+    // EnsureSuperadminHasTwoFactorEnabled::ALLOWED_ROUTES do anything —
+    // without this, those routes were never gated in the first place.
+    'middleware' => ['web', 'mfa.superadmin'],
 
     /*
     |--------------------------------------------------------------------------

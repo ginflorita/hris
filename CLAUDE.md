@@ -19,9 +19,12 @@ on any module; this file only summarizes conventions and status.
 - Auth backend is Laravel Fortify, used headless (`config/fortify.php`,
   `app/Providers/FortifyServiceProvider.php`) — our own Blade views in
   `resources/views/auth/`, not Fortify's stub views or Jetstream/Livewire
+- RBAC is `spatie/laravel-permission` (`config/permission.php`) — our own
+  `App\Models\Role` subclass (see Authorization below), not the package's
+  own views (it doesn't ship any) or its teams feature
 
-No starter kit (Breeze/Jetstream) is installed. RBAC and everything past
-Authentication is unbuilt — see Status below.
+No starter kit (Breeze/Jetstream) is installed. Organization and
+everything past RBAC is unbuilt — see Status below.
 
 ## Architecture
 
@@ -38,7 +41,7 @@ app/
 ├── Listeners/        auth/security event listeners (login logging, security notifications)
 ├── Models/
 ├── Notifications/
-├── Policies/         Laravel authorization policies
+├── Policies/         UserPolicy, RolePolicy — see Authorization below
 ├── Services/          cross-cutting services (not owned by one subdomain)
 └── Support/
 ```
@@ -59,7 +62,9 @@ non-negotiable — don't relax these for convenience):
 - Authorization is RBAC **plus** data scope (own record / team / department
   / branch / company / all) — a permission like `employees.view` never by
   itself implies access to every employee (§34). Never fall back to an
-  `is_admin` boolean check.
+  `is_admin` boolean check — the one exception is Superadmin's
+  `Gate::before()` bypass, and that's a role inside the RBAC system, not a
+  substitute for it (see Authorization below).
 - Every payslip/document access checks object-level ownership
   (`payslip.employee_id === auth()->user()->employee_id`) unless the actor
   holds an explicit payroll permission — this is the one most worth writing
@@ -82,16 +87,17 @@ non-negotiable — don't relax these for convenience):
   (`login_logs`), active-sessions list + force logout, password
   confirmation for sensitive actions, security-alert emails. See
   Authentication below before touching any of this.
+- Phase 4 — RBAC & Authorization: roles/permissions (`spatie/laravel-
+  permission`), the 10 default roles seeded with permissions (§32/§33),
+  Superadmin protection + mandatory MFA (§30, now enforced), a `data_scope`
+  concept on every role (§34) whose *enforcement* mostly waits on Phase 5/6,
+  and admin UI for Users/Roles/Permissions. See Authorization below.
 
-**Not started:** Phase 4 (RBAC) onward — Organization, Employees, and so
-on through Phase 18. Follow the phase order in blueprint §54/§59; don't
-jump ahead to a later phase's tables/UI before its dependencies exist.
-Re-read the relevant blueprint section before starting a phase — this
-file is a summary, not a substitute.
-
-Auth is deliberately not fully wired to RBAC yet: "Superadmin MFA
-mandatory" (§17.2/§30) can't be enforced before a Superadmin role exists.
-When Phase 4 lands, add that enforcement rather than re-deriving it.
+**Not started:** Phase 5 (Organization) onward, through Phase 18. Follow
+the phase order in blueprint §54/§59; don't jump ahead to a later phase's
+tables/UI before its dependencies exist. Re-read the relevant blueprint
+section before starting a phase — this file is a summary, not a
+substitute.
 
 ## Authentication
 
@@ -133,6 +139,70 @@ Non-obvious things worth knowing before changing this area:
   recorded to `login_logs` via listeners on Laravel's own auth events.
   Both sets of listeners are plain classes in `app/Listeners/`,
   auto-discovered — no manual `Event::listen()` wiring.
+
+## Authorization
+
+RBAC is `spatie/laravel-permission`. `config('permission.models.role')`
+points at `App\Models\Role` (extends the package's own `Role` model to add
+the `data_scope` cast) rather than the package's class directly — anywhere
+you'd type-hint or import a Role, use `App\Models\Role`, not
+`Spatie\Permission\Models\Role`; using the wrong one is why a policy or
+cast silently won't apply. `App\Enums\DefaultRole` names the 10 seeded
+roles (§32) — reach for it instead of a raw string wherever code needs to
+know about one of them by name. The full permission catalog (§33, ~40
+permissions) is seeded by `RoleAndPermissionSeeder`, mostly *reserved*
+ahead of their module (e.g. `payroll.finalize` exists before Payroll does)
+— a permission row existing doesn't mean anything's actually checking it
+yet; each phase adds the `$this->authorize(...)` calls for its own
+permissions as it's built, using the seeder's existing names rather than
+inventing new ones.
+
+**Superadmin** bypasses every permission check via `Gate::before()`
+(`AppServiceProvider`) rather than being assigned every permission
+explicitly — assigning all of them by hand would silently stop covering
+permissions added by later phases. `User::isSuperadmin()` is the one place
+that decides who this applies to. Protection (§30) is enforced two ways:
+- `users.is_protected` (only the seeded account has it) blocks disable and
+  Superadmin-role removal in `UserPolicy` — checked there, not skipped by
+  the Gate bypass, because the bypass only fires for the *actor*, and
+  these checks are about the *target*.
+- Separately, `UserPolicy::removeSuperadminRole()` also blocks removing
+  the role from whoever is currently the *last* Superadmin, protected or
+  not — don't let the system reach zero Superadmins.
+- MFA is mandatory for Superadmin: `EnsureSuperadminHasTwoFactorEnabled`
+  (`mfa.superadmin` alias) redirects to `/security` until 2FA is
+  confirmed. Applied to our own protected route groups AND to
+  `config('fortify.middleware')` (so Fortify's own 2FA/password routes
+  are covered too) — its `ALLOWED_ROUTES` allowlist is what keeps that
+  from being a redirect loop.
+- The Superadmin *role itself* can't be edited or deleted (`RolePolicy`)
+  — its permission list is never shown in the UI, since its real power is
+  the Gate bypass above, not that list.
+
+**Data scope** (§34): `App\Enums\DataScope` (Own/Team/Department/Branch/
+Company/All) lives on `roles.data_scope`, one value per role rather than
+per permission grant — in practice a role's permissions share one reach,
+and one column per role is far simpler to query than a scope on every row
+of `role_has_permissions`. The seeded roles all have a real value (see
+`RoleAndPermissionSeeder::ROLES`), but nothing queries it yet — Phase 5
+(Organization) and Phase 6 (Employee) don't exist yet to scope against.
+When a Domain model needs it: resolve the acting user's effective scope
+as the *broadest* among their roles for that permission (a user with both
+a Team-scoped and a Company-scoped role gets Company for actions either
+covers), then filter the query accordingly — don't build a fake example
+against a model that doesn't exist.
+
+**A mass-assigned field silently missing from `$fillable` fails loudly
+outside production** (`Model::preventSilentlyDiscardingAttributes()` in
+`AppServiceProvider`) instead of the `update()` call quietly no-op'ing —
+added after exactly that shape of bug shipped past manual testing once
+already (`disable()`/`enable()` on `User` before `disabled_at` was
+fillable). `is_system_account`/`is_protected` are deliberately kept off
+`User::$fillable` even though `disabled_at` is on it — the one place that
+sets them (`DatabaseSeeder`) goes through a factory, which bypasses
+`$fillable` entirely, so they don't need to be, and leaving them off means
+no stray `$user->update($request->all())` can ever grant Superadmin-style
+protection to an arbitrary account.
 
 ## Commands
 

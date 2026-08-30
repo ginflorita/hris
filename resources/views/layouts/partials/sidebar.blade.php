@@ -1,8 +1,7 @@
 {{--
-    Static nav for now — every item other than Dashboard points nowhere
-    because the underlying module hasn't been built yet (see CLAUDE.md
-    "Status"). Once RBAC (Phase 4) exists, this needs to filter sections
-    by the current user's permissions rather than listing everything.
+    Mostly still static placeholders — most modules aren't built yet (see
+    CLAUDE.md "Status"). ADMINISTRATION > Users/Roles is real and
+    permission-gated; the rest light up the same way as their phase lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -25,13 +24,29 @@
             'PAYROLL' => ['Payroll', 'Payroll Periods', 'Compensation', 'Benefits', 'Payslips'],
             'TALENT' => ['Recruitment', 'Applicants', 'Onboarding', 'Performance', 'Training', 'Skills', 'Career'],
             'REPORTS' => ['HR Reports', 'Attendance Reports', 'Leave Reports', 'Payroll Reports', 'Analytics'],
-            'ADMINISTRATION' => ['Users', 'Roles', 'Permissions', 'Workflows', 'Notifications', 'Announcements', 'Audit Logs', 'Security', 'Settings'],
+            'ADMINISTRATION' => [
+                'Users' => ['route' => 'admin.users.index', 'can' => ['viewAny', \App\Models\User::class]],
+                'Roles' => ['route' => 'admin.roles.index', 'can' => ['viewAny', \App\Models\Role::class]],
+                'Permissions' => ['route' => 'admin.permissions.index', 'can' => ['viewAny', \App\Models\Role::class]],
+                'Workflows' => null,
+                'Notifications' => null,
+                'Announcements' => null,
+                'Audit Logs' => null,
+                'Settings' => null,
+            ],
         ] as $section => $items)
             <div class="nav-section-title">{{ $section }}</div>
             <ul class="nav nav-pills flex-column mb-2">
-                @foreach ($items as $item)
+                @foreach ($items as $label => $item)
+                    @php($config = is_array($item) ? $item : null)
+                    @php($label = is_int($label) ? $item : $label)
                     <li class="nav-item">
-                        <span class="nav-link disabled text-body-secondary" aria-disabled="true">{{ $item }}</span>
+                        @if ($config && Route::has($config['route']) && auth()->user()?->can(...$config['can']))
+                            <a class="nav-link {{ request()->routeIs($config['route'].'*') ? 'active' : '' }}"
+                               href="{{ route($config['route']) }}">{{ $label }}</a>
+                        @else
+                            <span class="nav-link disabled text-body-secondary" aria-disabled="true">{{ $label }}</span>
+                        @endif
                     </li>
                 @endforeach
             </ul>

@@ -56,7 +56,7 @@
                     </tr>
                     <tr>
                         <td>4 — RBAC &amp; Authorization</td>
-                        <td><span class="badge text-bg-secondary">Not started</span></td>
+                        <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
                         <td>5–18 — Organization through Production</td>
