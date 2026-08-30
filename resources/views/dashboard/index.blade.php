@@ -59,7 +59,11 @@
                         <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
-                        <td>5–18 — Organization through Production</td>
+                        <td>5 — Organization</td>
+                        <td><span class="badge text-bg-success">Done</span></td>
+                    </tr>
+                    <tr>
+                        <td>6–18 — Employee through Production</td>
                         <td><span class="badge text-bg-secondary">Not started</span></td>
                     </tr>
                 </tbody>

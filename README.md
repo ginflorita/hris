@@ -51,10 +51,12 @@ vendor/bin/pint --test  # check formatting without changing files
 ## Project status
 
 Phase 1 (project foundation), part of Phase 2 (UI shell), Phase 3
-(authentication — login, 2FA, password reset, sessions), and Phase 4
-(RBAC — roles, permissions, Superadmin protection, user management) are
-in place — see the dashboard's build-status panel or `CLAUDE.md` for
-what's done and what's next. The system is built in phases per
+(authentication — login, 2FA, password reset, sessions), Phase 4
+(RBAC — roles, permissions, Superadmin protection, user management), and
+Phase 5 (Organization — company/division/department/section/team
+hierarchy, positions, job levels/grades, cost centers) are in place —
+see the dashboard's build-status panel or `CLAUDE.md` for what's done and
+what's next. The system is built in phases per
 [`docs/HRIS_Blueprint.md` §54](docs/HRIS_Blueprint.md#54-development-phases);
 modules are not built out of order.
 
