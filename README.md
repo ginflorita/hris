@@ -61,10 +61,12 @@ contacts, government IDs, dependents, documents, notes), Phase 7
 promotion, transfer, salary changes, regularization, and separation),
 Phase 8 (Attendance & Scheduling — holidays, shifts, schedules,
 daily attendance with audit-logged corrections, overtime approval, and
-an attendance summary report), and Phase 9 (Leave Management — leave
+an attendance summary report), Phase 9 (Leave Management — leave
 types/policies, an audit-ledger balance system, and leave requests with
-submit/approve/reject/cancel) are in place — see the dashboard's
-build-status panel or `CLAUDE.md` for what's done and what's next. The
+submit/approve/reject/cancel), and Phase 10 (Compensation — salary
+structures/grades, allowances/bonuses/incentives) are in place — see the
+dashboard's build-status panel or `CLAUDE.md` for what's done and what's
+next. The
 system is built in phases per
 [`docs/HRIS_Blueprint.md` §54](docs/HRIS_Blueprint.md#54-development-phases);
 modules are not built out of order.

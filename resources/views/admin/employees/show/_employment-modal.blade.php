@@ -66,6 +66,16 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Salary grade</label>
+                        <select name="salary_grade_id" class="form-select">
+                            <option value="">None</option>
+                            @foreach ($salaryGrades as $salaryGrade)
+                                <option value="{{ $salaryGrade->id }}">{{ $salaryGrade->name }} ({{ number_format($salaryGrade->min_salary, 0) }}–{{ number_format($salaryGrade->max_salary, 0) }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Manager</label>
                         <select name="manager_id" class="form-select">
                             <option value="">None</option>

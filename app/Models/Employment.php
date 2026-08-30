@@ -15,7 +15,7 @@ class Employment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'employee_id', 'company_id', 'department_id', 'position_id', 'branch_id', 'location_id', 'manager_id',
+        'employee_id', 'company_id', 'department_id', 'position_id', 'salary_grade_id', 'branch_id', 'location_id', 'manager_id',
         'employment_type', 'work_arrangement', 'status', 'change_type',
         'probation_ends_at', 'regularized_at', 'basic_salary', 'contract_start_date', 'contract_end_date',
         'separation_reason', 'remarks', 'effective_date', 'end_date', 'created_by',
@@ -61,6 +61,11 @@ class Employment extends Model
     public function position(): BelongsTo
     {
         return $this->belongsTo(Position::class);
+    }
+
+    public function salaryGrade(): BelongsTo
+    {
+        return $this->belongsTo(SalaryGrade::class);
     }
 
     public function branch(): BelongsTo

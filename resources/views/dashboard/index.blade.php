@@ -79,7 +79,11 @@
                         <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
-                        <td>10–18 — Compensation through Production</td>
+                        <td>10 — Compensation</td>
+                        <td><span class="badge text-bg-success">Done</span></td>
+                    </tr>
+                    <tr>
+                        <td>11–18 — Payroll Engine through Production</td>
                         <td><span class="badge text-bg-secondary">Not started</span></td>
                     </tr>
                 </tbody>

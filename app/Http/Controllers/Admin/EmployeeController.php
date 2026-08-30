@@ -12,6 +12,7 @@ use App\Models\Employee;
 use App\Models\LeaveType;
 use App\Models\Location;
 use App\Models\Position;
+use App\Models\SalaryGrade;
 use App\Models\Schedule;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -74,6 +75,7 @@ class EmployeeController extends Controller
             'employeeSchedules' => fn ($q) => $q->with('schedule'),
             'leaveBalances' => fn ($q) => $q->with('leaveType'),
             'leaveTransactions' => fn ($q) => $q->with(['leaveType', 'createdBy'])->orderByDesc('date')->orderByDesc('id'),
+            'compensationItems' => fn ($q) => $q->orderByDesc('effective_date'),
         ]);
 
         return view('admin.employees.show', [
@@ -85,6 +87,7 @@ class EmployeeController extends Controller
             'managers' => Employee::where('company_id', $employee->company_id)->where('id', '!=', $employee->id)->orderBy('last_name')->get(),
             'schedules' => Schedule::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'leaveTypes' => LeaveType::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'salaryGrades' => SalaryGrade::where('company_id', $employee->company_id)->orderBy('name')->get(),
         ]);
     }
 

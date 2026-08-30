@@ -127,4 +127,9 @@ class Employee extends Model
     {
         return $this->hasMany(LeaveTransaction::class);
     }
+
+    public function compensationItems(): HasMany
+    {
+        return $this->hasMany(CompensationItem::class);
+    }
 }

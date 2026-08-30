@@ -125,8 +125,20 @@ non-negotiable — don't relax these for convenience):
   per the blueprint's own §12 workflow diagram. See Leave below — this
   is the first module with real business logic in `app/Domain/`, not
   just flat controllers.
+- Phase 10 — Compensation: `SalaryStructure`/`SalaryGrade` (CRUD, a
+  grade's min/mid/max range *is* its "salary band" — no separate band
+  table), a `salary_grade_id` on `employments` alongside the
+  `basic_salary` snapshot already there, and `CompensationItem`
+  (allowances/bonuses/incentives — one flexible table, not three) on the
+  employee profile's new Compensation tab. Salary adjustments,
+  promotions, and salary history needed no new tables — Phase 7's
+  `Employment` already covers all three (a `change_type=salary_change`
+  row, `change_type=promotion` row, and the Employment History tab,
+  respectively). See Compensation below, including how its permission
+  gating had to be reused across two different existing groups since the
+  seeded catalog has no `compensation.*` permissions of its own.
 
-**Not started:** Phase 10 (Compensation) onward, through Phase 18.
+**Not started:** Phase 11 (Payroll Engine) onward, through Phase 18.
 Follow the phase order in blueprint §54/§59; don't jump ahead to a later
 phase's tables/UI before its dependencies exist. Re-read the relevant
 blueprint section before starting a phase — this file is a summary, not
@@ -518,6 +530,47 @@ a balance actually changes is a manual `Adjustment` (via the employee
 profile's Leave tab) or `Usage`/`Reversal` from request approval/
 cancellation. Don't fake automatic accrual in the UI; document the gap
 like this instead.
+
+## Compensation
+
+`SalaryStructure` (a named, dated compensation plan — e.g. "2026 Salary
+Structure") contains `SalaryGrade`s, each with `min_salary`/
+`mid_salary`/`max_salary`. Blueprint §20 lists "salary grades" and
+"salary bands" as separate bullets, but a grade's band *is* its
+min/mid/max range — a third table would just be `salary_bands.grade_id`
+1:1 with nothing else on it, so it's collapsed into `SalaryGrade`
+instead. `Employment` (Phase 7) gained a nullable `salary_grade_id`
+(migration `2026_10_25_250003`, added to the existing table rather than
+changing its original migration) alongside the `basic_salary` it already
+had — an Employment row can reference *which* grade an employee is on
+as well as their actual snapshot salary, which don't have to match
+exactly (someone can be paid above or below their grade's band).
+
+**Salary adjustments, promotions, and salary history are not new
+tables** — they're exactly what `Employment`'s `change_type` values
+(`salary_change`, `promotion`) and the Employment History tab already
+provide (see Employment above). Don't build a parallel
+"compensation history" table; a compensation change *is* a new
+`Employment` row.
+
+**`CompensationItem` is one table for allowances, bonuses, *and*
+incentives** (a `type` enum), not three near-identical tables — they
+only differ by category, not structure (name, amount, frequency,
+effective/end date). Managed from the employee profile's Compensation
+tab, same nested-controller-plus-modal pattern as the other per-employee
+sub-resources (Phase 6).
+
+**Permission gating is split across two existing groups, not a new
+`compensation.*` one** — the seeded catalog (`RoleAndPermissionSeeder`)
+has no compensation permissions at all, and CLAUDE.md's own rule is to
+reuse existing names rather than invent new ones. `SalaryStructure`/
+`SalaryGrade` reuse `organization.view`/`organization.manage` (they're
+company-wide classification data, the same shape as `Position`/
+`JobGrade` from Phase 5); `CompensationItem` reuses `employees.view`/
+`employees.update` (it's a per-employee record, the same shape as
+`Employment`/`EmployeeDocument`). If Payroll (Phase 11) needs a
+dedicated `compensation.*` permission group, that's the natural point to
+add one — don't add it speculatively here.
 
 ## Commands
 

@@ -36,6 +36,10 @@
                         <dd class="col-sm-7">{{ $current->position?->title ?? '—' }}</dd>
                         <dt class="col-sm-5 text-body-secondary fw-normal">Department</dt>
                         <dd class="col-sm-7">{{ $current->department?->name ?? '—' }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Salary grade</dt>
+                        <dd class="col-sm-7">{{ $current->salaryGrade?->name ?? '—' }}</dd>
+                        <dt class="col-sm-5 text-body-secondary fw-normal">Basic salary</dt>
+                        <dd class="col-sm-7">{{ $current->basic_salary !== null ? number_format($current->basic_salary, 2) : '—' }}</dd>
                         <dt class="col-sm-5 text-body-secondary fw-normal">Branch</dt>
                         <dd class="col-sm-7">{{ $current->branch?->name ?? '—' }}</dd>
                         <dt class="col-sm-5 text-body-secondary fw-normal">Manager</dt>

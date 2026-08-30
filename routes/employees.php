@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CompensationItemController;
 use App\Http\Controllers\Admin\EmployeeAddressController;
 use App\Http\Controllers\Admin\EmployeeContactController;
 use App\Http\Controllers\Admin\EmployeeController;
@@ -52,5 +53,9 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::post('employments', [EmploymentController::class, 'store'])->name('employments.store');
             Route::post('schedules', [EmployeeScheduleController::class, 'store'])->name('schedules.store');
             Route::post('leave-balance/adjust', [LeaveBalanceController::class, 'adjust'])->name('leave-balance.adjust');
+
+            Route::post('compensation-items', [CompensationItemController::class, 'store'])->name('compensation-items.store');
+            Route::put('compensation-items/{item}', [CompensationItemController::class, 'update'])->name('compensation-items.update');
+            Route::delete('compensation-items/{item}', [CompensationItemController::class, 'destroy'])->name('compensation-items.destroy');
         });
     });

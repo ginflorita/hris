@@ -2,8 +2,9 @@
     Mostly still static placeholders — most modules aren't built yet (see
     CLAUDE.md "Status"). WORKFORCE > Employees/Organization/Positions,
     TIME & ATTENDANCE > Attendance/Schedules/Shifts/Overtime/Holidays/
-    Leave, and ADMINISTRATION > Users/Roles/Permissions are real and
-    permission-gated; the rest light up the same way as their phase lands.
+    Leave, PAYROLL > Compensation, and ADMINISTRATION > Users/Roles/
+    Permissions are real and permission-gated; the rest light up the
+    same way as their phase lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -48,7 +49,17 @@
                     'active' => ['admin.leave.*'],
                 ],
             ],
-            'PAYROLL' => ['Payroll', 'Payroll Periods', 'Compensation', 'Benefits', 'Payslips'],
+            'PAYROLL' => [
+                'Payroll' => null,
+                'Payroll Periods' => null,
+                'Compensation' => [
+                    'route' => 'admin.compensation.structures.index',
+                    'can' => ['organization.view'],
+                    'active' => ['admin.compensation.*'],
+                ],
+                'Benefits' => null,
+                'Payslips' => null,
+            ],
             'TALENT' => ['Recruitment', 'Applicants', 'Onboarding', 'Performance', 'Training', 'Skills', 'Career'],
             'REPORTS' => ['HR Reports', 'Attendance Reports', 'Leave Reports', 'Payroll Reports', 'Analytics'],
             'ADMINISTRATION' => [

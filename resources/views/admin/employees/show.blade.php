@@ -59,6 +59,7 @@
             'overview' => 'Overview',
             'employment' => 'Employment History',
             'leave' => 'Leave',
+            'compensation' => 'Compensation',
             'addresses' => 'Addresses',
             'contacts' => 'Contacts',
             'emergency-contacts' => 'Emergency Contacts',
@@ -83,6 +84,9 @@
         </div>
         <div class="tab-pane fade" id="leave" role="tabpanel">
             @include('admin.employees.show._leave')
+        </div>
+        <div class="tab-pane fade" id="compensation" role="tabpanel">
+            @include('admin.employees.show._compensation')
         </div>
         <div class="tab-pane fade" id="addresses" role="tabpanel">
             @include('admin.employees.show._addresses')

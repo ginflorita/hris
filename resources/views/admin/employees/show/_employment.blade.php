@@ -13,6 +13,7 @@
                     <th>Change</th>
                     <th>Position</th>
                     <th>Department</th>
+                    <th>Salary Grade</th>
                     <th>Type</th>
                     <th>Status</th>
                     <th>Salary</th>
@@ -30,6 +31,7 @@
                         <td>{{ ucwords(str_replace('_', ' ', $record->change_type->value)) }}</td>
                         <td>{{ $record->position?->title ?? '—' }}</td>
                         <td>{{ $record->department?->name ?? '—' }}</td>
+                        <td>{{ $record->salaryGrade?->name ?? '—' }}</td>
                         <td>{{ ucwords(str_replace('_', ' ', $record->employment_type->value)) }}</td>
                         <td>{{ ucwords(str_replace('_', ' ', $record->status->value)) }}</td>
                         <td>{{ $record->basic_salary !== null ? number_format($record->basic_salary, 2) : '—' }}</td>
