@@ -89,4 +89,9 @@ class Company extends Model
     {
         return $this->hasMany(Schedule::class);
     }
+
+    public function leaveTypes(): HasMany
+    {
+        return $this->hasMany(LeaveType::class);
+    }
 }

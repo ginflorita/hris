@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\EmployeeGovernmentIdController;
 use App\Http\Controllers\Admin\EmployeeNoteController;
 use App\Http\Controllers\Admin\EmployeeScheduleController;
 use App\Http\Controllers\Admin\EmploymentController;
+use App\Http\Controllers\Admin\LeaveBalanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
@@ -50,5 +51,6 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
 
             Route::post('employments', [EmploymentController::class, 'store'])->name('employments.store');
             Route::post('schedules', [EmployeeScheduleController::class, 'store'])->name('schedules.store');
+            Route::post('leave-balance/adjust', [LeaveBalanceController::class, 'adjust'])->name('leave-balance.adjust');
         });
     });

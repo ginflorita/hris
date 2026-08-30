@@ -58,6 +58,7 @@
         @foreach ([
             'overview' => 'Overview',
             'employment' => 'Employment History',
+            'leave' => 'Leave',
             'addresses' => 'Addresses',
             'contacts' => 'Contacts',
             'emergency-contacts' => 'Emergency Contacts',
@@ -79,6 +80,9 @@
         </div>
         <div class="tab-pane fade" id="employment" role="tabpanel">
             @include('admin.employees.show._employment')
+        </div>
+        <div class="tab-pane fade" id="leave" role="tabpanel">
+            @include('admin.employees.show._leave')
         </div>
         <div class="tab-pane fade" id="addresses" role="tabpanel">
             @include('admin.employees.show._addresses')

@@ -117,8 +117,16 @@ non-negotiable — don't relax these for convenience):
   report. Direct approve/reject rather than routing through a generic
   workflow engine — Workflow (blueprint module 27/48) is a later,
   not-yet-built module. See Attendance below.
+- Phase 9 — Leave Management: Leave Types/Policies (CRUD), an audit-
+  ledger balance system (`leave_balances` cached totals backed by an
+  append-only `leave_transactions` table), and Leave Requests with
+  submit → approve/reject/cancel — balance is only touched on approval
+  (and reversed on cancelling an approved request), never at submission,
+  per the blueprint's own §12 workflow diagram. See Leave below — this
+  is the first module with real business logic in `app/Domain/`, not
+  just flat controllers.
 
-**Not started:** Phase 9 (Leave Management) onward, through Phase 18.
+**Not started:** Phase 10 (Compensation) onward, through Phase 18.
 Follow the phase order in blueprint §54/§59; don't jump ahead to a later
 phase's tables/UI before its dependencies exist. Re-read the relevant
 blueprint section before starting a phase — this file is a summary, not
@@ -465,6 +473,51 @@ workflow_definitions-style engine (blueprint module 27/48, a later,
 not-yet-built module). Don't build a bespoke approval chain here either;
 when Workflow lands, this is a candidate to migrate onto it, not to
 extend further with more ad-hoc states.
+
+## Leave
+
+Four entities: `LeaveType`/`LeavePolicy` (company-scoped CRUD, same
+pattern as Organization/Attendance) and `LeaveRequest`/the balance
+ledger (`LeaveBalance` + `LeaveTransaction`). `<x-admin.leave-subnav>`
+cross-links Requests/Calendar/Leave Types/Policies/Report the same way
+the other subnav components do.
+
+**`LeaveBalance.balance` is a cache, never written to directly outside
+`App\Domain\Leave\Services\LeaveBalanceService::applyTransaction()`.**
+That's the one place that (a) locks the balance row, (b) writes the new
+total, and (c) inserts the `LeaveTransaction` row explaining the change
+— all in one `DB::transaction()`. Every caller (manual adjustment via
+`LeaveBalanceController::adjust()`, request approval, cancellation
+reversal) goes through it, so `leave_transactions` is always a complete,
+correct audit trail of every balance change and its reason. This is the
+first genuinely shared piece of business logic since Phase 6, and the
+first real use of `app/Domain/` (previously just empty placeholders,
+see `app/Domain/README.md`) — controllers stayed flat through Phases
+5-8 because nothing needed the same logic from more than one call site;
+Leave does, so it earns a service. Don't retroactively move Phase 5-8
+logic into `app/Domain/` just for consistency — only reach for it when
+a new module has the same shared-logic shape Leave does.
+
+**Balance changes on approval, not on submission** — `LeaveRequestController::store()`
+creates the request as `pending` and touches nothing else; only
+`approve()` calls `applyTransaction()` (type `usage`, a negative
+amount). This matches blueprint §12's own workflow diagram (Request →
+Manager → HR → Approved → *Balance Updated*, in that order) rather than
+optimistically reserving days at submission time. Cancelling a `pending`
+request is a pure status change; cancelling an `approved` one calls
+`applyTransaction()` again with type `reversal` and a *positive* amount
+equal to `days_count` — the original `usage` transaction is never
+edited or deleted, only offset by a new row, so the ledger still shows
+both the deduction and its reversal.
+
+**No accrual scheduler yet.** `LeavePolicy` stores the accrual rules
+(rate, frequency, max balance, carry-over), but nothing runs them on a
+cron — `LeaveTransactionType::Accrual` and `::CarryOver` exist in the
+ledger's vocabulary for when that job is built, but today the only way
+a balance actually changes is a manual `Adjustment` (via the employee
+profile's Leave tab) or `Usage`/`Reversal` from request approval/
+cancellation. Don't fake automatic accrual in the UI; document the gap
+like this instead.
 
 ## Commands
 

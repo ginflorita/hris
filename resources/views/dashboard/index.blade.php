@@ -75,7 +75,11 @@
                         <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
-                        <td>9–18 — Leave through Production</td>
+                        <td>9 — Leave Management</td>
+                        <td><span class="badge text-bg-success">Done</span></td>
+                    </tr>
+                    <tr>
+                        <td>10–18 — Compensation through Production</td>
                         <td><span class="badge text-bg-secondary">Not started</span></td>
                     </tr>
                 </tbody>

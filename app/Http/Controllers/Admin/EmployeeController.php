@@ -9,6 +9,7 @@ use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\LeaveType;
 use App\Models\Location;
 use App\Models\Position;
 use App\Models\Schedule;
@@ -71,6 +72,8 @@ class EmployeeController extends Controller
             'documents.uploadedBy', 'notes.createdBy',
             'employments' => fn ($q) => $q->with(['department', 'position', 'branch', 'location', 'manager']),
             'employeeSchedules' => fn ($q) => $q->with('schedule'),
+            'leaveBalances' => fn ($q) => $q->with('leaveType'),
+            'leaveTransactions' => fn ($q) => $q->with(['leaveType', 'createdBy'])->orderByDesc('date')->orderByDesc('id'),
         ]);
 
         return view('admin.employees.show', [
@@ -81,6 +84,7 @@ class EmployeeController extends Controller
             'locations' => Location::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'managers' => Employee::where('company_id', $employee->company_id)->where('id', '!=', $employee->id)->orderBy('last_name')->get(),
             'schedules' => Schedule::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'leaveTypes' => LeaveType::where('company_id', $employee->company_id)->orderBy('name')->get(),
         ]);
     }
 
