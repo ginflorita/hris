@@ -1,6 +1,10 @@
 // App shell layout: fixed sidebar (desktop) / offcanvas sidebar (mobile),
 // sticky topbar, and compact table styling per the HRIS UI requirements.
 
+[x-cloak] {
+    display: none !important;
+}
+
 .app-shell {
     min-height: 100vh;
 }

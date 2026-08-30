@@ -34,6 +34,7 @@ cp .env.example .env
 php artisan key:generate
 
 php artisan migrate
+php artisan db:seed   # optional: creates one dev login, see database/seeders/DatabaseSeeder.php
 
 npm run build   # or `npm run dev` for hot reload while working on frontend
 php artisan serve
@@ -49,7 +50,8 @@ vendor/bin/pint --test  # check formatting without changing files
 
 ## Project status
 
-Phase 1 (project foundation) and part of Phase 2 (UI shell) are in place —
+Phase 1 (project foundation), part of Phase 2 (UI shell), and Phase 3
+(authentication — login, 2FA, password reset, sessions) are in place —
 see the dashboard's build-status panel or `CLAUDE.md` for what's done and
 what's next. The system is built in phases per
 [`docs/HRIS_Blueprint.md` §54](docs/HRIS_Blueprint.md#54-development-phases);

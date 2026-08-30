@@ -52,7 +52,7 @@
                     </tr>
                     <tr>
                         <td>3 — Authentication</td>
-                        <td><span class="badge text-bg-secondary">Not started</span></td>
+                        <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
                         <td>4 — RBAC &amp; Authorization</td>

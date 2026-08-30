@@ -16,15 +16,18 @@ on any module; this file only summarizes conventions and status.
 - Sessions use the `database` driver everywhere (including production) —
   intentional, not a fallback: the blueprint's "view active sessions /
   force logout" features (§18, §31) need queryable session rows
+- Auth backend is Laravel Fortify, used headless (`config/fortify.php`,
+  `app/Providers/FortifyServiceProvider.php`) — our own Blade views in
+  `resources/views/auth/`, not Fortify's stub views or Jetstream/Livewire
 
-No starter kit (Breeze/Jetstream) is installed. Auth, RBAC, and everything
-past the UI shell is unbuilt — see Status below.
+No starter kit (Breeze/Jetstream) is installed. RBAC and everything past
+Authentication is unbuilt — see Status below.
 
 ## Architecture
 
 ```
 app/
-├── Actions/        cross-cutting single-purpose actions
+├── Actions/         cross-cutting single-purpose actions (+ Actions/Fortify — see Authentication below)
 ├── Domain/          business logic by bounded context — see app/Domain/README.md
 │   ├── Employee/ Attendance/ Leave/ Payroll/ Recruitment/
 │   ├── Performance/ Training/ Benefits/ Workflow/ Security/
@@ -32,6 +35,7 @@ app/
 ├── Events/
 ├── Http/Controllers/   thin — delegate to a Domain service
 ├── Jobs/            queued work (payroll processing, PDF/payslip generation, bulk email)
+├── Listeners/        auth/security event listeners (login logging, security notifications)
 ├── Models/
 ├── Notifications/
 ├── Policies/         Laravel authorization policies
@@ -72,12 +76,63 @@ non-negotiable — don't relax these for convenience):
   sidebar (mobile), breadcrumbs, light/dark/system mode, a placeholder
   dashboard. No employee/manager portal layouts yet, no forms/modals/table
   component library beyond what Bootstrap provides out of the box.
+- Phase 3 — Authentication: login, logout, password reset, password
+  change, 2FA (TOTP + recovery codes), login throttling, account
+  status (`users.disabled_at`), login/logout/failed-login logging
+  (`login_logs`), active-sessions list + force logout, password
+  confirmation for sensitive actions, security-alert emails. See
+  Authentication below before touching any of this.
 
-**Not started:** everything from Phase 3 onward — Authentication, RBAC,
-Organization, Employees, and so on through Phase 18. Follow the phase order
-in blueprint §54/§59; don't jump ahead to a later phase's tables/UI before
-its dependencies exist. Re-read the relevant blueprint section before
-starting a phase — this file is a summary, not a substitute.
+**Not started:** Phase 4 (RBAC) onward — Organization, Employees, and so
+on through Phase 18. Follow the phase order in blueprint §54/§59; don't
+jump ahead to a later phase's tables/UI before its dependencies exist.
+Re-read the relevant blueprint section before starting a phase — this
+file is a summary, not a substitute.
+
+Auth is deliberately not fully wired to RBAC yet: "Superadmin MFA
+mandatory" (§17.2/§30) can't be enforced before a Superadmin role exists.
+When Phase 4 lands, add that enforcement rather than re-deriving it.
+
+## Authentication
+
+Backend is Laravel Fortify (`laravel/fortify`), used **headless** — we
+supply every view (`resources/views/auth/*.blade.php`,
+`resources/views/layouts/guest.blade.php`) via `Fortify::loginView()` etc.
+in `FortifyServiceProvider`; Fortify only owns the routes/controllers/
+validation. Enabled features: `resetPasswords`, `updatePasswords`,
+`twoFactorAuthentication` (confirm + confirmPassword required).
+Registration and profile-info features are off — accounts are
+admin-provisioned (§31), not self-registered; that provisioning UI is
+Phase 4's job, so for now `database/seeders/DatabaseSeeder.php` creates
+one dev user (`admin@example.test` / see the seeder for the password;
+never runs in production automatically).
+
+Non-obvious things worth knowing before changing this area:
+
+- **`config('fortify.limiters.login')` is `null` on purpose.** Fortify's
+  own internal pipeline (`EnsureLoginIsNotThrottled` /
+  `LoginRateLimiter`) already throttles failed attempts to 5/minute per
+  email+IP with a friendly inline error. A `throttle:login` *route*
+  middleware runs *before* that pipeline step and fails closed with a
+  raw unstyled 429 page instead — don't re-add a named `login` limiter.
+- **`Auth::logoutOtherDevices()` is a no-op without `AuthenticateSession`
+  middleware** on protected routes (it only rehashes the password; some
+  middleware has to actually compare hashes per-request to catch other
+  sessions). That's the `auth.session` alias in `bootstrap/app.php`,
+  applied alongside `auth` in `routes/web.php` and `routes/auth.php`.
+- **Password policy is length + composition (`AppServiceProvider`), not
+  `Password::uncompromised()`** — deliberately not calling out to
+  api.pwnedpasswords.com, since an HRIS is often deployed behind a
+  locked-down corporate/on-prem network that wouldn't reach it.
+- Fortify's 2FA/password-update error messages live in **named error
+  bags** (`updatePassword`, `confirmTwoFactorAuthentication`) — use
+  `@error('field', 'bagName')` in Blade, not the default bag.
+- Security-relevant events (`PasswordReset`, `PasswordUpdatedViaController`,
+  `TwoFactorAuthenticationConfirmed`/`Disabled`) trigger an email via
+  `App\Notifications\SecurityAlert`; login/failed-login/logout are
+  recorded to `login_logs` via listeners on Laravel's own auth events.
+  Both sets of listeners are plain classes in `app/Listeners/`,
+  auto-discovered — no manual `Event::listen()` wiring.
 
 ## Commands
 

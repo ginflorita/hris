@@ -11,34 +11,25 @@
         @yield('title', 'Dashboard')
     </div>
 
+    @include('layouts.partials.theme-toggle')
+
     <div class="dropdown">
-        <button class="btn btn-outline-secondary d-flex align-items-center" id="theme-toggle" type="button"
-                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle theme">
-            <svg class="theme-icon-active" width="16" height="16" fill="currentColor">
-                <use href="#theme-icon-light"></use>
+        <button class="btn btn-outline-secondary d-flex align-items-center gap-2" id="account-menu" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 6.5c0-2.5 2.5-4.5 5.5-4.5s5.5 2 5.5 4.5"
+                      fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
+            <span class="d-none d-sm-inline">{{ auth()->user()?->name }}</span>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="theme-toggle">
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="account-menu">
+            <li><a class="dropdown-item" href="{{ route('security.index') }}">Security &amp; sessions</a></li>
+            <li><hr class="dropdown-divider"></li>
             <li>
-                <button type="button" class="dropdown-item d-flex align-items-center gap-2 active"
-                        data-bs-theme-value="light" aria-pressed="true">
-                    <svg width="16" height="16" fill="currentColor"><use href="#theme-icon-light"></use></svg>
-                    Light
-                </button>
-            </li>
-            <li>
-                <button type="button" class="dropdown-item d-flex align-items-center gap-2"
-                        data-bs-theme-value="dark" aria-pressed="false">
-                    <svg width="16" height="16" fill="currentColor"><use href="#theme-icon-dark"></use></svg>
-                    Dark
-                </button>
-            </li>
-            <li>
-                <button type="button" class="dropdown-item d-flex align-items-center gap-2"
-                        data-bs-theme-value="auto" aria-pressed="false">
-                    <svg width="16" height="16" fill="currentColor"><use href="#theme-icon-auto"></use></svg>
-                    System
-                </button>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="dropdown-item">Log out</button>
+                </form>
             </li>
         </ul>
     </div>
