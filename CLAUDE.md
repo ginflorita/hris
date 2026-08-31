@@ -165,24 +165,27 @@ non-negotiable — don't relax these for convenience):
   previously-missing link blueprint §17's ownership rule depends on);
   and `payslip_access_logs` plus a `PayslipPublished` notification. See
   Payroll Approval and Digital Payslip Portal below.
-- Phase 13 (partial) — Employee & Manager Self-Service: read-only **My
-  Profile** in the portal (bio overview, Employment History, Documents);
-  self-service **My Leave**/**Leave Request**/**My Overtime** (submit for
-  oneself only, cancel a leave request with the same balance-reversal
-  logic as the admin side); **My Attendance** correction requests
-  (employee proposes a correction, HR approves through the same
-  audit-logged `AttendanceCorrectionService` a direct correction uses);
-  **Request COE** (Certificate of Employment, four blueprint variants,
-  approval freezes a snapshot of current Employment so a re-download
-  never silently changes); and Manager Self-Service, delivered as
+- Phase 13 — Employee & Manager Self-Service: read-only **My Profile** in
+  the portal (bio overview, Employment History, Documents); self-service
+  **My Leave**/**Leave Request**/**My Overtime** (submit for oneself
+  only, cancel a leave request with the same balance-reversal logic as
+  the admin side); **My Attendance** correction requests (employee
+  proposes a correction, HR approves through the same audit-logged
+  `AttendanceCorrectionService` a direct correction uses); **Request
+  COE** (Certificate of Employment, four blueprint variants, approval
+  freezes a snapshot of current Employment so a re-download never
+  silently changes); Manager Self-Service, delivered as
   `roles.data_scope` finally being enforced (`DataScopeResolver`) on the
   existing admin Employee/Leave/Attendance/Overtime controllers rather
-  than a separate manager UI — see Employee Self-Service below for all
-  of this and what's still missing (a "Requests" aggregation view).
+  than a separate manager UI; and a **Requests** aggregation view merging
+  all four request types into one portal page. See Employee Self-Service
+  below for the full set of decisions and the handful of bullets left
+  genuinely unbuilt because their underlying module (Benefits,
+  Performance, Training) doesn't exist yet.
 
-**Not started:** the remainder of Phase 13, then Phase 14 onward through
-Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
-to a later phase's tables/UI before its dependencies exist. Re-read the
+**Not started:** Phase 14 onward through Phase 18. Follow the phase
+order in blueprint §54/§59; don't jump ahead to a later phase's
+tables/UI before its dependencies exist. Re-read the
 relevant blueprint section before starting a phase — this file is a
 summary, not a substitute.
 
@@ -1052,7 +1055,7 @@ and skipping employees with no linked account) -- same `Queueable`-but-
 not-`ShouldQueue` shape as `SecurityAlert`, sent via the same `$user->
 notify(...)` call site convention rather than `notifyNow()`.
 
-## Employee Self-Service (Phase 13, in progress)
+## Employee Self-Service (Phase 13, completed)
 
 Phase 13 is "Employee & Manager Self-Service" (blueprint §54). First
 slice (13a) done: read-only **My Profile** in the portal (bio overview,
@@ -1206,9 +1209,23 @@ performance reviews" and "View team statistics" stay unbuilt (Performance
 is a later, not-yet-built module; no statistics/reporting view exists
 for this yet).
 
-**Still not built**: a "Requests" aggregation view across all request
-types (leave/overtime/attendance correction/COE in one list instead of
-four separate portal pages).
+**13f — Requests aggregation view, closing out Phase 13.** Blueprint
+§41's portal sidebar lists "Requests" as one flat item alongside the
+type-specific pages, not a replacement for them — `Portal\RequestController
+::index()` reads the employee's `leaveRequests`/`overtimeRequests`/
+`attendanceCorrectionRequests`/`coeRequests`, normalizes each into a
+common `{type, date, detail, status, link}` shape, and merges/sorts them
+by date. Purely a read-only presentation merge with no shared invariant
+to protect (unlike `LeaveBalanceService`), so it lives directly in the
+controller rather than a Domain service — each row's `link` just points
+back to that type's own page for the actual submit/cancel/download
+actions, which stay exactly where Phase 13a-13d built them.
+
+Every blueprint §18/§19 bullet buildable without a not-yet-built module
+(Benefits, Performance, Training) now has a real implementation. Phase
+13 is complete for what's buildable today; "View benefits/training/
+performance", "Conduct performance reviews", and "View team statistics"
+remain documented gaps waiting on their own later phases, not oversights.
 
 ## Commands
 

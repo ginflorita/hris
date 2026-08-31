@@ -6,6 +6,7 @@ use App\Http\Controllers\Portal\LeaveController;
 use App\Http\Controllers\Portal\OvertimeController;
 use App\Http\Controllers\Portal\PayslipController;
 use App\Http\Controllers\Portal\ProfileController;
+use App\Http\Controllers\Portal\RequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
@@ -31,4 +32,6 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
         Route::get('coe', [CoeRequestController::class, 'index'])->name('coe.index');
         Route::post('coe', [CoeRequestController::class, 'store'])->name('coe.store');
         Route::get('coe/{coe_request}/download', [CoeRequestController::class, 'download'])->name('coe.download');
+
+        Route::get('requests', [RequestController::class, 'index'])->name('requests.index');
     });
