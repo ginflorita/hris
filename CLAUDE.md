@@ -1104,12 +1104,57 @@ correction uses, not `attendance.manage`) and guard
 `status === Pending` so a decision can't be re-applied or reversed by
 resubmitting the form.
 
-**Still not built**: a COE (Certificate of Employment) request +
-generation flow (no `CoeRequest` table exists anywhere yet), a manager
-portal (direct-reports visibility and approvals, buildable now that
-`Employment.manager_id` plus `users.employee_id` together can resolve
-"which logged-in user manages this employee"), and a "Requests"
-aggregation view across all request types.
+**13d — COE (Certificate of Employment) requests.** Blueprint §25:
+Request COE → HR Approval → Generate PDF → Available in Portal, with
+four supported variants (`App\Enums\CoeRequestType`): Standard, With
+Compensation, Without Compensation, Employment Verification.
+`Portal\CoeRequestController::store()` lets an employee submit a
+`type` + optional free-text `purpose` (e.g. "Bank loan application")
+against their own record; nothing is generated yet at this point.
+
+"Generate PDF" isn't a separate step or a stored file — approve()
+freezes a snapshot of the employee's *current* `Employment` (position
+title, department name, employment status, salary if the type is
+`WithCompensation`) plus their earliest `Employment` row's
+`effective_date` as "date hired" onto five `snapshot_*` columns on the
+`coe_requests` row itself, and the PDF is rendered from that frozen
+snapshot on every download — the same "render on demand from data
+that's already immutable" shape `Portal\PayslipController::download()`
+uses for payslips, just applied to a snapshot instead of a naturally-
+immutable finalized-payroll row. Freezing at approval time matters
+because current `Employment` is *not* immutable the way a finalized
+`PayrollItem` is: without a snapshot, a COE re-downloaded after the
+employee's next promotion would silently show different data than the
+copy already handed to whatever bank or embassy asked for it — the same
+"never silently change a historical record" principle CLAUDE.md applies
+to compensation and payroll, extended to a certificate once issued.
+No `AttendanceCorrectionService`-style extracted domain service here —
+unlike attendance corrections, there's only one call site for the
+snapshot logic (`Admin\CoeRequestController::approve()`); CLAUDE.md's
+own rule is not to add `app/Domain/` structure until a second caller
+actually needs the same logic.
+
+No `coe.*` permission group — approving/downloading is a per-employee-
+record action, same shape Compensation reused `employees.view`/
+`employees.update` for, so this does too. The one addition: approving or
+downloading a `WithCompensation` request also requires
+`employees.salary.view`, a permission the catalog has reserved since
+Phase 4 but that nothing checked until now (only Payroll Administrator
+is seeded with it — not even HR Administrator/HR Staff). This is
+blueprint §19's "don't automatically give access to salary" rule,
+applied to the one place in this module where compensation could leak
+onto a document; the admin index view hides the Approve button (shows
+"Requires salary access" instead) on a `WithCompensation` row when the
+viewer lacks it, rather than showing a button that would just 403.
+
+**Still not built**: a manager portal (direct-reports visibility and
+approvals, buildable now that `Employment.manager_id` plus
+`users.employee_id` together can resolve "which logged-in user manages
+this employee" — note the seeded `Manager` role currently lacks
+`attendance.manage`, so it can view but not yet approve overtime;
+worth revisiting when that portal is built) and a "Requests"
+aggregation view across all request types (leave/overtime/attendance
+correction/COE in one list instead of four separate portal pages).
 
 ## Commands
 

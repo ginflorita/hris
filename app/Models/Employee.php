@@ -118,6 +118,11 @@ class Employee extends Model
         return $this->hasMany(AttendanceCorrectionRequest::class);
     }
 
+    public function coeRequests(): HasMany
+    {
+        return $this->hasMany(CoeRequest::class);
+    }
+
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);

@@ -4,8 +4,8 @@
     sidebar (layouts/partials/sidebar.blade.php) -- My Payslips (Phase
     12), My Profile/Employment/Documents (13a, read-only), My
     Leave/Leave Request/My Overtime (13b, self-service submit + cancel),
-    and My Attendance (13c, correction requests) are the real links so
-    far; everything else is a later Phase 13 slice.
+    My Attendance (13c, correction requests), and Request COE (13d) are
+    the real links so far; everything else is a later Phase 13 slice.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -43,7 +43,7 @@
             ],
             'DOCUMENTS' => [
                 'My Documents' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
-                'Request COE' => null,
+                'Request COE' => ['route' => 'portal.coe.index', 'active' => ['portal.coe.*']],
             ],
             'OTHER' => ['Performance', 'Training', 'Requests', 'Announcements', 'Notifications'],
             'ACCOUNT' => [

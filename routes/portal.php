@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Portal\AttendanceController;
+use App\Http\Controllers\Portal\CoeRequestController;
 use App\Http\Controllers\Portal\LeaveController;
 use App\Http\Controllers\Portal\OvertimeController;
 use App\Http\Controllers\Portal\PayslipController;
@@ -26,4 +27,8 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
 
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::post('attendance/{attendance}/correction-requests', [AttendanceController::class, 'store'])->name('attendance.correction-requests.store');
+
+        Route::get('coe', [CoeRequestController::class, 'index'])->name('coe.index');
+        Route::post('coe', [CoeRequestController::class, 'store'])->name('coe.store');
+        Route::get('coe/{coe_request}/download', [CoeRequestController::class, 'download'])->name('coe.download');
     });
