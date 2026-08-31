@@ -60,4 +60,28 @@ class PayrollItem extends Model
     {
         return $this->hasMany(PayrollItemContribution::class);
     }
+
+    /**
+     * Basic, non-blocking sanity checks surfaced on the period/item show
+     * pages -- Phase 11 has nowhere to attach a hard block (Approve/
+     * Reject is Phase 12's job), so these are flags for a reviewer to
+     * look at, not gates. See CLAUDE.md "Payroll" for why the list stays
+     * this short rather than a broader validation rules engine.
+     *
+     * @return array<int, string>
+     */
+    public function validationIssues(): array
+    {
+        $issues = [];
+
+        if ((float) $this->net_pay < 0) {
+            $issues[] = 'Net pay is negative -- contributions and tax exceed gross earnings.';
+        }
+
+        if ((float) $this->gross_earnings > 0 && $this->tax_table_id === null) {
+            $issues[] = 'No active tax table matched this period -- tax was not computed.';
+        }
+
+        return $issues;
+    }
 }

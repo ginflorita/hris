@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ContributionRateBracketController;
 use App\Http\Controllers\Admin\ContributionRateTableController;
 use App\Http\Controllers\Admin\PayrollGroupController;
+use App\Http\Controllers\Admin\PayrollItemAdjustmentController;
 use App\Http\Controllers\Admin\PayrollItemController;
 use App\Http\Controllers\Admin\PayrollPeriodController;
 use App\Http\Controllers\Admin\TaxTableBracketController;
@@ -18,6 +19,10 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
 
         Route::get('payroll-items/{payroll_item}', [PayrollItemController::class, 'show'])
             ->name('payroll-items.show');
+        Route::post('payroll-items/{payroll_item}/adjustments', [PayrollItemAdjustmentController::class, 'store'])
+            ->name('payroll-items.adjustments.store');
+        Route::delete('payroll-items/{payroll_item}/adjustments/{line}', [PayrollItemAdjustmentController::class, 'destroy'])
+            ->name('payroll-items.adjustments.destroy');
 
         Route::resource('contribution-rate-tables', ContributionRateTableController::class);
         Route::post('contribution-rate-tables/{contribution_rate_table}/brackets', [ContributionRateBracketController::class, 'store'])

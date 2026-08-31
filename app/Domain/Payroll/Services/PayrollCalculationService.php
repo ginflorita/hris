@@ -25,12 +25,17 @@ use Illuminate\Support\Facades\DB;
  * (overtime pay, holiday pay) and why, and for the proration convention
  * (App\Enums\PayFrequency::periodsPerYear()) this relies on.
  *
- * Reprocessing a Draft/ForReview period replaces each employee's item
- * wholesale (delete + regenerate, cascading its lines/contributions) --
- * safe because nothing downstream depends on the old numbers yet.
- * Phase 11d's manual adjustment lines will need this to preserve
- * is_adjustment lines instead of blanket-deleting; not needed today
- * since nothing produces one yet.
+ * Reprocessing a Draft/ForReview period replaces each employee's
+ * auto-generated lines and contributions wholesale, but preserves any
+ * manual adjustment lines (PayrollItemLine::is_adjustment) already on
+ * the item -- see processEmployee(). Manual adjustments only ever affect
+ * gross_earnings/total_deductions/net_pay, both here and in
+ * recalculateTotals() (called after adding/removing a single
+ * adjustment) -- they never feed back into contributions or tax_amount,
+ * on a reprocess or otherwise. Contributions key off basic_salary and
+ * tax keys off the auto-generated gross only, matching how real
+ * government contribution/tax tables are keyed off basic/regular pay,
+ * not ad hoc corrections layered on top afterward.
  */
 class PayrollCalculationService
 {
@@ -173,10 +178,27 @@ class PayrollCalculationService
             }
         }
 
-        $netPay = round($grossEarnings - $totalEmployeeContributions - $taxAmount, 2);
+        // Reprocessing wipes the prior item's auto-generated lines/contributions, but
+        // manual adjustments survive -- captured here before the old item is cascade-deleted.
+        $existingItem = PayrollItem::where('payroll_period_id', $period->id)->where('employee_id', $employee->id)->first();
+        $preservedAdjustments = $existingItem
+            ? $existingItem->lines()->where('is_adjustment', true)->get()
+                ->map(fn ($line) => $line->only(['type', 'category', 'label', 'amount', 'is_adjustment', 'remarks', 'created_by']))
+                ->all()
+            : [];
+        $existingItem?->delete();
 
-        // Reprocessing wipes the prior item for this employee/period wholesale -- see class docblock.
-        PayrollItem::where('payroll_period_id', $period->id)->where('employee_id', $employee->id)->delete();
+        $totalDeductions = 0.0;
+        foreach ($preservedAdjustments as $adjustment) {
+            if ($adjustment['type'] === PayrollItemLineType::Deduction) {
+                $totalDeductions += (float) $adjustment['amount'];
+            } else {
+                $grossEarnings = round($grossEarnings + (float) $adjustment['amount'], 2);
+            }
+        }
+        $totalDeductions = round($totalDeductions, 2);
+
+        $netPay = round($grossEarnings - $totalDeductions - $totalEmployeeContributions - $taxAmount, 2);
 
         $payrollItem = PayrollItem::create([
             'payroll_period_id' => $period->id,
@@ -188,13 +210,35 @@ class PayrollCalculationService
             'total_employer_contributions' => $totalEmployerContributions,
             'tax_table_id' => $appliedTaxTable?->id,
             'tax_amount' => $taxAmount,
-            'total_deductions' => 0,
+            'total_deductions' => $totalDeductions,
             'net_pay' => $netPay,
             'computed_at' => now(),
         ]);
 
         $payrollItem->lines()->createMany($lines);
+        $payrollItem->lines()->createMany($preservedAdjustments);
         $payrollItem->contributions()->createMany($contributions);
+    }
+
+    /**
+     * Recompute gross_earnings/total_deductions/net_pay from an item's
+     * current lines after a manual adjustment is added or removed.
+     * Deliberately does not touch contributions or tax_amount -- see the
+     * class docblock for why. Called by PayrollItemAdjustmentController.
+     */
+    public function recalculateTotals(PayrollItem $item): void
+    {
+        $item->loadMissing('lines');
+
+        $grossEarnings = round((float) $item->lines->where('type', PayrollItemLineType::Earning)->sum('amount'), 2);
+        $totalDeductions = round((float) $item->lines->where('type', PayrollItemLineType::Deduction)->sum('amount'), 2);
+        $netPay = round($grossEarnings - $totalDeductions - (float) $item->total_employee_contributions - (float) $item->tax_amount, 2);
+
+        $item->update([
+            'gross_earnings' => $grossEarnings,
+            'total_deductions' => $totalDeductions,
+            'net_pay' => $netPay,
+        ]);
     }
 
     /**

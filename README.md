@@ -63,8 +63,12 @@ Phase 8 (Attendance & Scheduling — holidays, shifts, schedules,
 daily attendance with audit-logged corrections, overtime approval, and
 an attendance summary report), Phase 9 (Leave Management — leave
 types/policies, an audit-ledger balance system, and leave requests with
-submit/approve/reject/cancel), and Phase 10 (Compensation — salary
-structures/grades, allowances/bonuses/incentives) are in place — see the
+submit/approve/reject/cancel), Phase 10 (Compensation — salary
+structures/grades, allowances/bonuses/incentives), and Phase 11 (Payroll
+Engine — versioned government contribution/tax rate tables, payroll
+groups/periods, a calculation engine producing per-employee payroll
+items with earnings/contributions/tax, and manual adjustments with
+validation flags) are in place — see the
 dashboard's build-status panel or `CLAUDE.md` for what's done and what's
 next. The
 system is built in phases per

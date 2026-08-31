@@ -137,12 +137,26 @@ non-negotiable — don't relax these for convenience):
   respectively). See Compensation below, including how its permission
   gating had to be reused across two different existing groups since the
   seeded catalog has no `compensation.*` permissions of its own.
+- Phase 11 — Payroll Engine: Government Rules (`ContributionRateTable`/
+  `Bracket`, `TaxTable`/`Bracket`, versioned and effective-dated per
+  §39), `PayrollGroup`/`PayrollPeriod` (the latter finally giving
+  blueprint §15's 9-state machine a real column, though Phase 11 only
+  ever writes `Draft`/`Processing`/`ForReview` to it), a
+  `PayrollCalculationService` that computes `PayrollItem` + line +
+  contribution records per employee per period (basic pay prorated by
+  pay frequency, active `CompensationItem`s, government contributions
+  and withholding tax from the versioned rate tables), and manual
+  adjustment lines with non-blocking validation flags. Overtime pay and
+  holiday pay peso amounts are a deliberate, documented gap (no rate-
+  policy data to compute them from yet). See Payroll below before
+  touching any of this — it consolidates several of blueprint's
+  suggested tables the same way Compensation and Organization did.
 
-**Not started:** Phase 11 (Payroll Engine) onward, through Phase 18.
-Follow the phase order in blueprint §54/§59; don't jump ahead to a later
-phase's tables/UI before its dependencies exist. Re-read the relevant
-blueprint section before starting a phase — this file is a summary, not
-a substitute.
+**Not started:** Phase 12 (Payroll Approval & Digital Payslip) onward,
+through Phase 18. Follow the phase order in blueprint §54/§59; don't
+jump ahead to a later phase's tables/UI before its dependencies exist.
+Re-read the relevant blueprint section before starting a phase — this
+file is a summary, not a substitute.
 
 ## Authentication
 
@@ -739,6 +753,58 @@ change over time (e.g. transferred from a weekly-paid role to a monthly-
 paid one), so it belongs on the effective-dated history, not a shortcut
 column on `Employee`. Set from the same "Record employment change" modal
 as salary grade.
+
+**Payroll Adjustments + Validation — the fourth and final Phase 11
+slice.** A manual adjustment is just a `PayrollItemLine` with
+`is_adjustment=true` (the columns Phase 11c added specifically for this)
+— there's no separate `payroll_adjustments` table. Only allowed while
+the item's period is `ForReview` (Phase 11's only reachable post-
+processing state; Phase 12's approve/finalize/lock states will need
+their own rule once they exist), enforced in
+`PayrollItemAdjustmentController`, not just hidden in the UI.
+
+**Adjustments only ever affect `gross_earnings`/`total_deductions`/
+`net_pay` — never `total_employee_contributions` or `tax_amount`, on a
+reprocess or otherwise.** `PayrollCalculationService::recalculateTotals()`
+(called after every add/remove) recomputes those three fields from the
+item's current lines and stops there; contributions key off
+`basic_salary` and tax keys off the auto-generated gross only, matching
+how real government contribution/tax tables are keyed off basic/regular
+pay, not ad hoc corrections layered on top afterward. A full Reprocess
+is a separate, explicit action for when a reviewer actually wants
+Phase 11c's whole calculation to run again — and even that preserves
+existing adjustment lines rather than discarding them (captured before
+the old `PayrollItem` cascade-deletes, re-attached to the new one; see
+`PayrollCalculationService::processEmployee()`).
+
+**Validation is flags, not gates.** `PayrollItem::validationIssues()`
+returns plain-English warnings (negative net pay; no tax table matched)
+surfaced as a badge on the period's employee list and an alert banner on
+the item detail page. Phase 11 has nowhere to attach a hard block —
+there's no Approve/Reject yet, that's Phase 12 — so these stay
+informational rather than blocking processing or adjustments. Kept
+short and concrete on purpose rather than growing into a rules engine;
+add to the list only when a real scenario needs flagging, the same
+"don't build for hypotheticals" restraint as everywhere else in this
+codebase.
+
+**Bug caught by browser verification, fixed before shipping:** the item
+detail page originally gave both cards in the right-hand column
+(Government Contributions, Deductions) their own `h-100` class, intending
+to match the Earnings column's height. With two stacked cards sharing one
+flex column, `h-100` instead made each card fight to fill the *stretched
+column's* full height independently, pushing the Deductions card's
+content out of its visible box (its Remove button became unclickable —
+caught by an automated click failing, not just a visual glance). `h-100`
+only makes sense for a single card per column; removed it from all three
+cards on this page now that the right column stacks two.
+
+Phase 11 (Payroll Engine) is now complete end-to-end: Government Rules
+(11a) → Payroll Groups/Periods (11b) → the calculation engine (11c) →
+adjustments and validation (11d). Everything through `ForReview` works;
+Review/Approve/Finalize/Lock/Publish and payslip generation are Phase
+12's job, per blueprint §54's own phase split — don't start building
+those without re-reading that section first.
 
 ## Commands
 

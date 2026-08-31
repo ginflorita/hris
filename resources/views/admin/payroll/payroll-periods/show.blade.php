@@ -72,8 +72,14 @@
                 </thead>
                 <tbody>
                     @forelse ($payrollItems as $item)
+                        @php($issues = $item->validationIssues())
                         <tr>
-                            <td>{{ $item->employee->full_name }}</td>
+                            <td>
+                                {{ $item->employee->full_name }}
+                                @if ($issues)
+                                    <span class="badge text-bg-danger" title="{{ implode(' ', $issues) }}">{{ count($issues) }} issue{{ count($issues) > 1 ? 's' : '' }}</span>
+                                @endif
+                            </td>
                             <td>{{ number_format($item->basic_salary, 2) }}</td>
                             <td>{{ number_format($item->gross_earnings, 2) }}</td>
                             <td>{{ number_format($item->total_employee_contributions, 2) }}</td>
@@ -91,6 +97,15 @@
                         </tr>
                     @endforelse
                 </tbody>
+                @if ($payrollItems->isNotEmpty())
+                    <tfoot>
+                        <tr class="fw-semibold">
+                            <td colspan="5">{{ $payrollItems->count() }} employee(s)</td>
+                            <td>{{ number_format($payrollItems->sum('net_pay'), 2) }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
     </div>

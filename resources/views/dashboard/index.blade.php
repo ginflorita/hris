@@ -83,7 +83,11 @@
                         <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
-                        <td>11–18 — Payroll Engine through Production</td>
+                        <td>11 — Payroll Engine</td>
+                        <td><span class="badge text-bg-success">Done</span></td>
+                    </tr>
+                    <tr>
+                        <td>12–18 — Payroll Approval through Production</td>
                         <td><span class="badge text-bg-secondary">Not started</span></td>
                     </tr>
                 </tbody>
