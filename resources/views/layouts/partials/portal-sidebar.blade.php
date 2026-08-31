@@ -1,9 +1,9 @@
 {{--
     Employee-facing portal (blueprint §41 "Employee Portal Sidebar").
     Same "static placeholder until built" convention as the admin
-    sidebar (layouts/partials/sidebar.blade.php) -- My Payslips is the
-    only real link so far (Phase 12's "digital payslip portal" bullet);
-    everything else here is Phase 13's job.
+    sidebar (layouts/partials/sidebar.blade.php) -- My Payslips (Phase
+    12) and My Profile/Employment/Documents (Phase 13a, read-only) are
+    the real links so far; everything else is a later Phase 13 slice.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -14,7 +14,7 @@
     <div class="offcanvas-body d-flex flex-column p-2">
         <ul class="nav nav-pills flex-column mb-2">
             <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('portal.payslips.*') ? 'active' : '' }}" href="{{ route('portal.payslips.index') }}">
+                <a class="nav-link {{ request()->routeIs('portal.profile.*') ? 'active' : '' }}" href="{{ route('portal.profile.show') }}">
                     Dashboard
                 </a>
             </li>
@@ -22,8 +22,8 @@
 
         @foreach ([
             'MY HR' => [
-                'My Profile' => null,
-                'My Employment' => null,
+                'My Profile' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
+                'My Employment' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
             ],
             'ATTENDANCE' => [
                 'My Attendance' => null,
@@ -40,7 +40,7 @@
                 'My Benefits' => null,
             ],
             'DOCUMENTS' => [
-                'My Documents' => null,
+                'My Documents' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
                 'Request COE' => null,
             ],
             'OTHER' => ['Performance', 'Training', 'Requests', 'Announcements', 'Notifications'],

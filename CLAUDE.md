@@ -165,12 +165,17 @@ non-negotiable — don't relax these for convenience):
   previously-missing link blueprint §17's ownership rule depends on);
   and `payslip_access_logs` plus a `PayslipPublished` notification. See
   Payroll Approval and Digital Payslip Portal below.
+- Phase 13 (partial) — Employee & Manager Self-Service: read-only **My
+  Profile** in the portal (bio overview, Employment History, Documents)
+  — see Employee Self-Service below for what's built and what's still
+  missing (self-service leave/overtime/attendance-correction requests,
+  COE requests, manager portal, "Requests" aggregation).
 
-**Not started:** Phase 13 (Employee & Manager Self-Service) onward
-through Phase 18. Follow the phase order in blueprint §54/§59; don't
-jump ahead to a later phase's tables/UI before its dependencies exist.
-Re-read the relevant blueprint section before starting a phase — this
-file is a summary, not a substitute.
+**Not started:** the remainder of Phase 13, then Phase 14 onward through
+Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
+to a later phase's tables/UI before its dependencies exist. Re-read the
+relevant blueprint section before starting a phase — this file is a
+summary, not a substitute.
 
 ## Authentication
 
@@ -1006,6 +1011,53 @@ status update, looping `payrollItems` eager-loaded with `employee.user`
 and skipping employees with no linked account) -- same `Queueable`-but-
 not-`ShouldQueue` shape as `SecurityAlert`, sent via the same `$user->
 notify(...)` call site convention rather than `notifyNow()`.
+
+## Employee Self-Service (Phase 13, in progress)
+
+Phase 13 is "Employee & Manager Self-Service" (blueprint §54). First
+slice (13a) done: read-only **My Profile** in the portal (bio overview,
+Employment History, Documents), reusing `Employee`/`Employment`/
+`EmployeeDocument` -- no new tables. `Portal\ProfileController` mirrors
+the admin employee-show page's three matching tabs, but as fresh,
+simpler read-only partials rather than including the admin ones
+directly: the admin Documents tab hard-codes
+`admin.employees.documents.download` (gated by `employees.view`), which
+an employee viewing their own record won't have, so reusing it verbatim
+would have meant either granting that permission (wrong: it grants
+access to *every* employee's documents, not just this one's) or forking
+the route out of the shared partial anyway. A fresh portal-side
+`downloadDocument()` action with its own `document.employee_id ===
+auth()->user()->employee_id` check was simpler than trying to make one
+partial serve two different authorization models.
+
+**Still no "update permitted information"** (a real §18 bullet) --
+viewing is this slice's whole scope; editing self-service fields is a
+separate, not-yet-built slice. Don't assume the profile page is
+edit-ready because the tabs mirror the admin page's tabs.
+
+**Not built yet, deliberately, because their underlying modules don't
+exist**: My Compensation, My Benefits (Benefits is Phase 16), My
+Overtime/My Schedule request views, Performance, Training (Phase 15) --
+blueprint §18 lists "View benefits/training/performance" as employee
+bullets, but there's nothing to view until those modules are built.
+Same phase-order discipline as everywhere else in this file: the portal
+sidebar shows them as placeholders (matching blueprint §41's full nav
+shape), not silently omitted, so it's clear what's planned versus what's
+out of scope for now.
+
+**Remaining Phase 13 scope, not yet built**: attendance-correction
+requests (a genuinely new employee-initiated workflow, distinct from
+`attendance_correction_logs` which is an audit trail written *during* an
+HR-side correction, not a request awaiting approval), self-service leave
+and overtime request submission (the existing `LeaveRequestController`/
+`OvertimeRequest` flows are admin-only -- `store()` lets the caller pick
+*any* `employee_id`, gated by `leave.create`, not scoped to the
+submitter's own record), a COE (Certificate of Employment) request +
+generation flow (no `CoeRequest` table exists anywhere yet), a manager
+portal (direct-reports visibility and approvals, buildable now that
+`Employment.manager_id` plus `users.employee_id` together can resolve
+"which logged-in user manages this employee"), and a "Requests"
+aggregation view across all request types.
 
 ## Commands
 

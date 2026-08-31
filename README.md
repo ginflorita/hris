@@ -68,12 +68,14 @@ structures/grades, allowances/bonuses/incentives), Phase 11 (Payroll
 Engine — versioned government contribution/tax rate tables, payroll
 groups/periods, a calculation engine producing per-employee payroll
 items with earnings/contributions/tax, and manual adjustments with
-validation flags), and Phase 12 (Payroll Approval & Digital Payslip —
+validation flags), Phase 12 (Payroll Approval & Digital Payslip —
 review/approve/finalize/lock/publish, a downloadable payslip PDF, and a
 minimal employee portal for viewing/downloading published payslips with
-access logging and an email notification) are in place — see the
-dashboard's build-status panel or `CLAUDE.md` for what's done and what's
-next. The
+access logging and an email notification), and part of Phase 13
+(Employee & Manager Self-Service — a read-only "My Profile" in the
+portal: bio overview, employment history, documents) are in place — see
+the dashboard's build-status panel or `CLAUDE.md` for what's done and
+what's next. The
 system is built in phases per
 [`docs/HRIS_Blueprint.md` §54](docs/HRIS_Blueprint.md#54-development-phases);
 modules are not built out of order.

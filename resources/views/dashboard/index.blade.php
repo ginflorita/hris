@@ -91,7 +91,11 @@
                         <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
-                        <td>13–18 — Self-Service through Production</td>
+                        <td>13 — Employee &amp; Manager Self-Service</td>
+                        <td><span class="badge text-bg-warning">In progress</span></td>
+                    </tr>
+                    <tr>
+                        <td>14–18 — Recruitment through Production</td>
                         <td><span class="badge text-bg-secondary">Not started</span></td>
                     </tr>
                 </tbody>
