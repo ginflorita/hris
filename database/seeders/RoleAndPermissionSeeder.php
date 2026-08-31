@@ -35,7 +35,7 @@ class RoleAndPermissionSeeder extends Seeder
         'employees' => ['view', 'create', 'update', 'archive', 'export'],
         'employees.salary' => ['view'],
         'organization' => ['view', 'manage'],
-        'attendance' => ['view', 'manage', 'correct'],
+        'attendance' => ['view', 'manage', 'correct', 'approve'],
         'leave' => ['view', 'create', 'approve', 'reject'],
         'payroll' => ['view', 'create', 'process', 'approve', 'finalize', 'lock', 'export'],
         'payslips' => ['view', 'download'],
@@ -104,7 +104,7 @@ class RoleAndPermissionSeeder extends Seeder
             'permissions' => [
                 'employees.view',
                 'leave.view', 'leave.approve', 'leave.reject',
-                'attendance.view',
+                'attendance.view', 'attendance.approve',
                 'performance.view',
             ],
         ],

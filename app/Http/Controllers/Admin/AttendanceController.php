@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Attendance\Services\AttendanceCorrectionService;
+use App\Domain\Security\Services\DataScopeResolver;
 use App\Enums\AttendanceSource;
 use App\Enums\AttendanceStatus;
 use App\Http\Controllers\Controller;
@@ -16,11 +17,16 @@ use Illuminate\View\View;
 
 class AttendanceController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, DataScopeResolver $scopeResolver): View
     {
         $this->authorize('attendance.view');
 
         $query = Attendance::with('employee')->orderByDesc('date');
+
+        $employeeIds = $scopeResolver->employeeIdsFor($request->user(), 'attendance.view');
+        if ($employeeIds !== null) {
+            $query->whereIn('employee_id', $employeeIds);
+        }
 
         if ($employeeId = $request->integer('employee_id')) {
             $query->where('employee_id', $employeeId);

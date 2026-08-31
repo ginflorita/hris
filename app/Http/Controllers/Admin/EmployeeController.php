@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Security\Services\DataScopeResolver;
 use App\Enums\CivilStatus;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
@@ -23,11 +24,16 @@ use Illuminate\View\View;
 
 class EmployeeController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, DataScopeResolver $scopeResolver): View
     {
         $this->authorize('employees.view');
 
         $query = Employee::with('company')->orderBy('last_name')->orderBy('first_name');
+
+        $employeeIds = $scopeResolver->employeeIdsFor($request->user(), 'employees.view');
+        if ($employeeIds !== null) {
+            $query->whereIn('id', $employeeIds);
+        }
 
         if (! $request->boolean('with_archived')) {
             $query->whereNull('archived_at');
@@ -65,9 +71,12 @@ class EmployeeController extends Controller
         return redirect()->route('admin.employees.show', $employee)->with('status', 'Employee created.');
     }
 
-    public function show(Employee $employee): View
+    public function show(Request $request, Employee $employee, DataScopeResolver $scopeResolver): View
     {
         $this->authorize('employees.view');
+
+        $employeeIds = $scopeResolver->employeeIdsFor($request->user(), 'employees.view');
+        abort_if($employeeIds !== null && ! in_array($employee->id, $employeeIds, true), 403);
 
         $employee->load([
             'company', 'addresses', 'contacts', 'emergencyContacts', 'governmentIds', 'dependents',

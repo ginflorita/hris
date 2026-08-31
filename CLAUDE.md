@@ -166,12 +166,19 @@ non-negotiable — don't relax these for convenience):
   and `payslip_access_logs` plus a `PayslipPublished` notification. See
   Payroll Approval and Digital Payslip Portal below.
 - Phase 13 (partial) — Employee & Manager Self-Service: read-only **My
-  Profile** in the portal (bio overview, Employment History, Documents),
-  plus self-service **My Leave**/**Leave Request**/**My Overtime**
-  (submit for oneself only, cancel a leave request with the same balance
-  -reversal logic as the admin side) — see Employee Self-Service below
-  for what's built and what's still missing (attendance-correction
-  requests, COE requests, manager portal, "Requests" aggregation).
+  Profile** in the portal (bio overview, Employment History, Documents);
+  self-service **My Leave**/**Leave Request**/**My Overtime** (submit for
+  oneself only, cancel a leave request with the same balance-reversal
+  logic as the admin side); **My Attendance** correction requests
+  (employee proposes a correction, HR approves through the same
+  audit-logged `AttendanceCorrectionService` a direct correction uses);
+  **Request COE** (Certificate of Employment, four blueprint variants,
+  approval freezes a snapshot of current Employment so a re-download
+  never silently changes); and Manager Self-Service, delivered as
+  `roles.data_scope` finally being enforced (`DataScopeResolver`) on the
+  existing admin Employee/Leave/Attendance/Overtime controllers rather
+  than a separate manager UI — see Employee Self-Service below for all
+  of this and what's still missing (a "Requests" aggregation view).
 
 **Not started:** the remainder of Phase 13, then Phase 14 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -264,19 +271,50 @@ Company/All) lives on `roles.data_scope`, one value per role rather than
 per permission grant — in practice a role's permissions share one reach,
 and one column per role is far simpler to query than a scope on every row
 of `role_has_permissions`. The seeded roles all have a real value (see
-`RoleAndPermissionSeeder::ROLES`), but nothing queries it yet — Phase 5
-(Organization) gives the hierarchy to scope *against*, Phase 6 (Employee)
-gives Company-level scope something concrete to filter (every employee
-carries `company_id`), and Phase 7 (Employment) is what actually records
-*where* an employee currently sits (their `currentEmployment`'s
-`department_id`/`branch_id`/manager chain) — the pieces now all exist,
-but no query anywhere resolves a role's `data_scope` and filters by it
-yet; that's still a real gap, not a false one.
-When a Domain model needs it: resolve the acting user's effective scope
-as the *broadest* among their roles for that permission (a user with both
-a Team-scoped and a Company-scoped role gets Company for actions either
-covers), then filter the query accordingly — don't build a fake example
-against a model that doesn't exist.
+`RoleAndPermissionSeeder::ROLES`).
+
+As of Phase 13e, `App\Domain\Security\Services\DataScopeResolver` closes
+this gap for the two scope values a seeded role actually uses: **Own**
+(the `Employee` self-service role) and **Team** (`Manager`, resolved via
+`Employment.manager_id` — see `Employee::scopeReportingTo()`).
+`employeeIdsFor($user, $permission)` returns `null` for "don't filter"
+or a `list<int>` of employee IDs to restrict a query to; it resolves
+scope against roles only — a permission granted directly to a user
+(`givePermissionTo()` with no role, as several older tests' ad-hoc
+"manager" test helpers do) carries no `data_scope` at all and is treated
+as unrestricted, since data_scope is a property of a *role*, not a raw
+permission grant. Applied so far to `Admin\EmployeeController`
+(index/show — "View team"), `Admin\LeaveRequestController`
+(index/approve/reject — "Approve leave"), `Admin\AttendanceController`
+(index — "View team attendance"), and `Admin\OvertimeRequestController`
+(index/approve/reject — "Approve overtime"). **Department/Branch/
+Company/All stay unenforced on purpose** — no seeded role exercises them
+today (every non-Manager, non-Employee role is Company-scoped, and nothing
+queries Company scope either), and building general enforcement for
+scopes nothing uses would be speculative, the same restraint applied to
+`LeaveBalanceService`/`AttendanceCorrectionService`. Concretely: an HR
+Administrator, HR Staff, Payroll Administrator, or Attendance Officer
+sees exactly what they did before Phase 13e — only Manager (and, if an
+Own-scoped role is ever also granted an admin-side permission, Employee)
+is actually restricted today.
+
+**Overtime approval needed a new permission, not a scope check alone.**
+Admin approve/reject was `attendance.manage`-gated, which Manager doesn't
+hold — granting it would also open shift/schedule/holiday CRUD and manual
+attendance entry company-wide, well past blueprint §19's "Approve
+overtime." Added `attendance.approve` (mirroring `leave.approve`'s
+naming) instead, granted only to Manager; `OvertimeRequestController`'s
+approve/reject accept *either* `attendance.manage` (unrestricted, as
+before) or `attendance.approve` (Team-scope checked) — same two-tier
+shape `attendance.correct`/`attendance.manage` already established in
+Phase 8 for "a role can do the narrow thing without the broad thing."
+
+When a Domain model needs a scope this resolver doesn't cover yet:
+resolve the acting user's effective scope as the *broadest* among their
+roles for that permission (a user with both a Team-scoped and a
+Company-scoped role gets Company for actions either covers), then filter
+the query accordingly — don't build a fake example against a model that
+doesn't exist.
 
 **A mass-assigned field silently missing from `$fillable` fails loudly
 outside production** (`Model::preventSilentlyDiscardingAttributes()` in
@@ -1147,14 +1185,30 @@ onto a document; the admin index view hides the Approve button (shows
 "Requires salary access" instead) on a `WithCompensation` row when the
 viewer lacks it, rather than showing a button that would just 403.
 
-**Still not built**: a manager portal (direct-reports visibility and
-approvals, buildable now that `Employment.manager_id` plus
-`users.employee_id` together can resolve "which logged-in user manages
-this employee" — note the seeded `Manager` role currently lacks
-`attendance.manage`, so it can view but not yet approve overtime;
-worth revisiting when that portal is built) and a "Requests"
-aggregation view across all request types (leave/overtime/attendance
-correction/COE in one list instead of four separate portal pages).
+**13e — Manager Self-Service, via data scope rather than a new portal.**
+Blueprint §19 reads like it wants a dedicated manager UI, but this
+codebase's RBAC design already put Manager-role users in `/admin`
+alongside every other role (`employees.view`, `leave.approve`,
+`attendance.view`, scoped Team) — the blueprint's own §41 Employee
+Portal Sidebar has no "My Team" section either, so there's no dedicated
+manager UI to build. The actual gap was that `roles.data_scope` had
+never been queried anywhere (documented above under "Data scope" since
+Phase 4) — a Manager could already reach `Admin\LeaveRequestController
+::approve()` etc. through the exact permissions they're seeded with, but
+nothing stopped them acting on *any* employee's request, not just their
+own team's. Phase 13e is `DataScopeResolver` plus wiring it into
+`EmployeeController`/`LeaveRequestController`/`AttendanceController`/
+`OvertimeRequestController` (see "Data scope" above for the full
+design) — "View team" / "View team attendance" / "Approve leave" /
+"Approve overtime" are now real, correctly-scoped capabilities of the
+existing Manager role, no new routes or views needed. "Conduct
+performance reviews" and "View team statistics" stay unbuilt (Performance
+is a later, not-yet-built module; no statistics/reporting view exists
+for this yet).
+
+**Still not built**: a "Requests" aggregation view across all request
+types (leave/overtime/attendance correction/COE in one list instead of
+four separate portal pages).
 
 ## Commands
 

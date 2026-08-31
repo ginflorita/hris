@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Security\Services\DataScopeResolver;
 use App\Enums\OvertimeStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
@@ -12,11 +13,16 @@ use Illuminate\View\View;
 
 class OvertimeRequestController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, DataScopeResolver $scopeResolver): View
     {
         $this->authorize('attendance.view');
 
         $query = OvertimeRequest::with('employee')->orderByDesc('date');
+
+        $employeeIds = $scopeResolver->employeeIdsFor($request->user(), 'attendance.view');
+        if ($employeeIds !== null) {
+            $query->whereIn('employee_id', $employeeIds);
+        }
 
         if ($status = $request->string('status')->toString()) {
             $query->where('status', $status);
@@ -58,9 +64,9 @@ class OvertimeRequestController extends Controller
         return redirect()->route('admin.attendance.overtime.index')->with('status', 'Overtime request submitted.');
     }
 
-    public function approve(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
+    public function approve(Request $request, OvertimeRequest $overtimeRequest, DataScopeResolver $scopeResolver): RedirectResponse
     {
-        $this->authorize('attendance.manage');
+        $this->authorizeApproval($request, $overtimeRequest, $scopeResolver);
 
         $overtimeRequest->update([
             'status' => OvertimeStatus::Approved,
@@ -72,9 +78,9 @@ class OvertimeRequestController extends Controller
         return back()->with('status', 'Overtime request approved.');
     }
 
-    public function reject(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
+    public function reject(Request $request, OvertimeRequest $overtimeRequest, DataScopeResolver $scopeResolver): RedirectResponse
     {
-        $this->authorize('attendance.manage');
+        $this->authorizeApproval($request, $overtimeRequest, $scopeResolver);
 
         $validated = $request->validate(['rejection_reason' => ['required', 'string', 'max:500']]);
 
@@ -86,5 +92,30 @@ class OvertimeRequestController extends Controller
         ]);
 
         return back()->with('status', 'Overtime request rejected.');
+    }
+
+    /**
+     * attendance.manage (full attendance administration, every seeded
+     * holder is Company-scope or broader) stays unrestricted exactly as
+     * before. attendance.approve is the new, narrower grant (Manager
+     * role only, Team-scoped) -- someone relying on *that* permission
+     * alone is checked against DataScopeResolver so they can only act on
+     * their own direct reports' requests. Resolving scope against
+     * whichever permission actually authorized the request matters: a
+     * Manager doesn't hold attendance.manage at all, so resolving scope
+     * against attendance.manage for them would (wrongly) come back
+     * empty instead of unrestricted-for-that-permission.
+     */
+    private function authorizeApproval(Request $request, OvertimeRequest $overtimeRequest, DataScopeResolver $scopeResolver): void
+    {
+        $user = $request->user();
+        abort_unless($user->can('attendance.manage') || $user->can('attendance.approve'), 403);
+
+        if ($user->can('attendance.manage')) {
+            return;
+        }
+
+        $employeeIds = $scopeResolver->employeeIdsFor($user, 'attendance.approve');
+        abort_if($employeeIds !== null && ! in_array($overtimeRequest->employee_id, $employeeIds, true), 403);
     }
 }

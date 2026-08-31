@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CivilStatus;
 use App\Enums\Gender;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -91,6 +92,16 @@ class Employee extends Model
     public function currentEmployment(): HasOne
     {
         return $this->hasOne(Employment::class)->whereNull('end_date');
+    }
+
+    /**
+     * Direct reports: employees whose *current* Employment names this
+     * employee as manager. Backs DataScope::Team -- see
+     * App\Domain\Security\Services\DataScopeResolver.
+     */
+    public function scopeReportingTo(Builder $query, int $managerEmployeeId): Builder
+    {
+        return $query->whereHas('currentEmployment', fn ($q) => $q->where('manager_id', $managerEmployeeId));
     }
 
     public function employeeSchedules(): HasMany

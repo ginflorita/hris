@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Leave\Services\LeaveBalanceService;
+use App\Domain\Security\Services\DataScopeResolver;
 use App\Enums\LeaveRequestStatus;
 use App\Enums\LeaveTransactionType;
 use App\Http\Controllers\Controller;
@@ -17,11 +18,16 @@ use Illuminate\View\View;
 
 class LeaveRequestController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, DataScopeResolver $scopeResolver): View
     {
         $this->authorize('leave.view');
 
         $query = LeaveRequest::with(['employee', 'leaveType'])->orderByDesc('start_date');
+
+        $employeeIds = $scopeResolver->employeeIdsFor($request->user(), 'leave.view');
+        if ($employeeIds !== null) {
+            $query->whereIn('employee_id', $employeeIds);
+        }
 
         if ($employeeId = $request->integer('employee_id')) {
             $query->where('employee_id', $employeeId);
@@ -85,9 +91,10 @@ class LeaveRequestController extends Controller
      * per the blueprint's own workflow (§12: Request -> Manager -> HR ->
      * Approved -> Balance Updated).
      */
-    public function approve(Request $request, LeaveRequest $leaveRequest, LeaveBalanceService $service): RedirectResponse
+    public function approve(Request $request, LeaveRequest $leaveRequest, LeaveBalanceService $service, DataScopeResolver $scopeResolver): RedirectResponse
     {
         $this->authorize('leave.approve');
+        $this->authorizeScope($request, $leaveRequest, 'leave.approve', $scopeResolver);
 
         abort_unless($leaveRequest->status === LeaveRequestStatus::Pending, 422, 'Only pending requests can be approved.');
 
@@ -111,9 +118,10 @@ class LeaveRequestController extends Controller
         return back()->with('status', 'Leave request approved.');
     }
 
-    public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    public function reject(Request $request, LeaveRequest $leaveRequest, DataScopeResolver $scopeResolver): RedirectResponse
     {
         $this->authorize('leave.reject');
+        $this->authorizeScope($request, $leaveRequest, 'leave.reject', $scopeResolver);
 
         abort_unless($leaveRequest->status === LeaveRequestStatus::Pending, 422, 'Only pending requests can be rejected.');
 
@@ -159,5 +167,18 @@ class LeaveRequestController extends Controller
         ]);
 
         return back()->with('status', 'Leave request cancelled.');
+    }
+
+    /**
+     * A Team-scoped holder of $permission (Manager role) may only act on
+     * requests from their own direct reports -- see
+     * App\Domain\Security\Services\DataScopeResolver. Company-scoped
+     * holders (HR Administrator) are unaffected: employeeIdsFor()
+     * returns null for them, same access as before this existed.
+     */
+    private function authorizeScope(Request $request, LeaveRequest $leaveRequest, string $permission, DataScopeResolver $scopeResolver): void
+    {
+        $employeeIds = $scopeResolver->employeeIdsFor($request->user(), $permission);
+        abort_if($employeeIds !== null && ! in_array($leaveRequest->employee_id, $employeeIds, true), 403);
     }
 }
