@@ -2,9 +2,10 @@
     Mostly still static placeholders — most modules aren't built yet (see
     CLAUDE.md "Status"). WORKFORCE > Employees/Organization/Positions/COE
     Requests, TIME & ATTENDANCE > Attendance/Schedules/Shifts/Overtime/
-    Holidays/Leave, PAYROLL > Compensation, TALENT > Recruitment, and
-    ADMINISTRATION > Users/Roles/Permissions are real and permission-
-    gated; the rest light up the same way as their phase lands.
+    Holidays/Leave, PAYROLL > Compensation, TALENT > Recruitment/
+    Applicants, and ADMINISTRATION > Users/Roles/Permissions are real
+    and permission-gated; the rest light up the same way as their phase
+    lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -79,9 +80,13 @@
                 'Recruitment' => [
                     'route' => 'admin.recruitment.requisitions.index',
                     'can' => ['recruitment.view'],
-                    'active' => ['admin.recruitment.*'],
+                    'active' => ['admin.recruitment.requisitions.*', 'admin.recruitment.postings.*'],
                 ],
-                'Applicants' => null,
+                'Applicants' => [
+                    'route' => 'admin.recruitment.applicants.index',
+                    'can' => ['recruitment.view'],
+                    'active' => ['admin.recruitment.applicants.*', 'admin.recruitment.applications.*'],
+                ],
                 'Onboarding' => null,
                 'Performance' => null,
                 'Training' => null,

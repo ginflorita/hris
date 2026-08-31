@@ -185,11 +185,14 @@ non-negotiable — don't relax these for convenience):
 
 - Phase 14 (partial) — Recruitment & Onboarding: **Job Requisitions**
   (headcount request, `pending → approved/rejected`, same request-then-
-  decide shape as Leave/Overtime) and **Job Postings** (`draft →
-  published → closed`, only creatable against an *approved* requisition).
-  See Recruitment below for what's built and the rest of the pipeline
-  still to come (Applicants, Applications, Interviews, Assessments, Job
-  Offers, hiring conversion into a real Employee record, Onboarding).
+  decide shape as Leave/Overtime); **Job Postings** (`draft → published
+  → closed`, only creatable against an *approved* requisition);
+  **Applicants** (a candidate-pool profile, deliberately not company-
+  scoped, with a private resume upload); and **Applications** (one
+  applicant against one posting, a nine-stage pipeline status with two
+  terminal exits). See Recruitment below for what's built and the rest
+  of the pipeline still to come (Interviews, Assessments, Job Offers,
+  hiring conversion into a real Employee record, Onboarding).
 
 **Not started:** the remainder of Phase 14, then Phase 15 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1286,12 +1289,47 @@ row, the evaluation (score/recommendation/notes) can just be columns on
 `interviews` itself rather than a 1:1 wrapper table, the same collapsing
 `SalaryGrade`/`PayrollItem` already did for their own suggested ERDs.
 
-**Not built yet**: Applicants, Applications (the pipeline status an
-applicant is at against a specific posting), Interviews, Assessments,
-Job Offers, and the hiring-conversion step where an accepted offer
-creates a real `Employee` + `Employment` row (the actual integration
-point back into Phase 6/7) — plus Onboarding (templates, tasks, per-hire
-completion tracking), which depends on that conversion existing first.
+**14b — Applicants + Applications.** An `Applicant` is deliberately
+**not** company-scoped, unlike every other entity in this app — see the
+migration comment for why (a candidate-pool profile can apply to
+postings across different companies; company-scoping happens per
+`Application`, via `job_posting → job_requisition → company_id`, the
+same denormalization chain 14a already set up). The resume is a single
+file directly on the `Applicant` row (`resume_path`/
+`resume_original_filename`, private `local` disk, authenticated
+download action checking `recruitment.view`) — the same
+"single-file-on-the-record" shape as `Employee::profile_photo_path`,
+not a full `ApplicantDocument` sub-resource, since blueprint's own
+function list already separates "Resume" from `applicant_documents` and
+only the former is in scope here.
+
+An `Application` links one applicant to one posting (`unique(
+[applicant_id, job_posting_id])` — the same applicant can't apply to the
+same posting twice, though they can apply to different postings, which
+is the whole point of keeping Applicant and Application separate
+tables). `ApplicationController::store()` only accepts a **published**
+posting (`Rule::exists(...)->where('status','published')`), reached from
+a modal on the applicant's own profile page (the natural entry point is
+"apply this candidate," not a blank two-picker form) — the same
+per-record-modal convention Employee's sub-resources (Phase 6) use.
+
+`updateStatus()` moves an application through `App\Enums\ApplicationStatus`
+(`Applied → Screening → Interview → Assessment → FinalInterview →
+Offered → Hired`, plus the terminal `Rejected`/`Withdrawn`) without
+enforcing strict linear ordering — a plain dropdown lets HR pick any
+non-terminal status directly, `Rejected` alone requires a reason (its
+own modal, matching every other reject flow in this app). This is a
+deliberate simplification: blueprint's Workflow Engine (§27) is an
+explicitly not-yet-built module, and this app already avoids bespoke
+approval chains elsewhere (Overtime, Phase 8) rather than half-building
+one ahead of it — once an application reaches a terminal status
+(`ApplicationStatus::isTerminal()`), it can't be changed again.
+
+**Not built yet**: Interviews, Assessments, Job Offers, and the
+hiring-conversion step where an accepted offer creates a real
+`Employee` + `Employment` row (the actual integration point back into
+Phase 6/7) — plus Onboarding (templates, tasks, per-hire completion
+tracking), which depends on that conversion existing first.
 
 ## Commands
 

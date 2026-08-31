@@ -4,6 +4,8 @@
     $items = [
         'requisitions' => 'Requisitions',
         'postings' => 'Postings',
+        'applicants' => 'Applicants',
+        'applications' => 'Applications',
     ];
 @endphp
 
