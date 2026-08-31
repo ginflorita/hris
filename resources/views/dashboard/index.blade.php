@@ -88,7 +88,7 @@
                     </tr>
                     <tr>
                         <td>12 — Payroll Approval &amp; Digital Payslip</td>
-                        <td><span class="badge text-bg-warning">In progress</span></td>
+                        <td><span class="badge text-bg-success">Done</span></td>
                     </tr>
                     <tr>
                         <td>13–18 — Self-Service through Production</td>

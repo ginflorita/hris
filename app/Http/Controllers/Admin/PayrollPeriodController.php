@@ -7,7 +7,9 @@ use App\Enums\PayrollPeriodStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\PayrollGroup;
+use App\Models\PayrollItem;
 use App\Models\PayrollPeriod;
+use App\Notifications\PayslipPublished;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -171,6 +173,11 @@ class PayrollPeriodController extends Controller
             'published_at' => now(),
             'published_by' => request()->user()->id,
         ]);
+
+        $payrollPeriod->payrollItems()->with('employee.user')->get()
+            ->each(function (PayrollItem $item) {
+                $item->employee->user?->notify(new PayslipPublished($item));
+            });
 
         return back()->with('status', 'Payroll period published -- payslips are now visible to employees.');
     }

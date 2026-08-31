@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\DefaultRole;
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -37,7 +40,7 @@ class UserController extends Controller
     {
         $this->authorize('create', User::class);
 
-        return view('admin.users.create', ['roles' => Role::orderBy('name')->get()]);
+        return view('admin.users.create', ['roles' => Role::orderBy('name')->get(), 'employees' => $this->linkableEmployees()]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,6 +50,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'employee_id' => ['nullable', Rule::exists('employees', 'id'), Rule::unique('users', 'employee_id')],
             'roles' => ['array'],
             'roles.*' => ['string', 'exists:roles,name'],
         ]);
@@ -54,6 +58,7 @@ class UserController extends Controller
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'employee_id' => ($validated['employee_id'] ?? null) ?: null,
             // Nobody chooses this password — it's immediately replaced by
             // the reset link sent below, so the creator never learns it.
             'password' => Hash::make(Str::random(40)),
@@ -74,6 +79,7 @@ class UserController extends Controller
         return view('admin.users.edit', [
             'targetUser' => $user->load('roles'),
             'roles' => Role::orderBy('name')->get(),
+            'employees' => $this->linkableEmployees($user),
         ]);
     }
 
@@ -84,7 +90,10 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'employee_id' => ['nullable', Rule::exists('employees', 'id'), Rule::unique('users', 'employee_id')->ignore($user->id)],
         ]);
+
+        $validated['employee_id'] = ($validated['employee_id'] ?? null) ?: null;
 
         $user->update($validated);
 
@@ -156,5 +165,20 @@ class UserController extends Controller
     private function destroyAllSessions(User $user): void
     {
         DB::table('sessions')->where('user_id', $user->id)->delete();
+    }
+
+    /**
+     * Employees not already linked to a different login account -- plus
+     * $user's own current link, if any, so it still shows as selected.
+     *
+     * @return Collection<int, Employee>
+     */
+    private function linkableEmployees(?User $user = null): Collection
+    {
+        return Employee::query()
+            ->whereDoesntHave('user', fn ($query) => $query->when($user, fn ($q) => $q->whereKeyNot($user->id)))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
     }
 }

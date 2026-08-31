@@ -43,6 +43,22 @@
                             @enderror
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label" for="employee_id">Linked employee</label>
+                            <select id="employee_id" name="employee_id" class="form-select @error('employee_id') is-invalid @enderror">
+                                <option value="">None</option>
+                                @foreach ($employees as $employee)
+                                    <option value="{{ $employee->id }}" {{ (int) old('employee_id', $targetUser->employee_id) === $employee->id ? 'selected' : '' }}>
+                                        {{ $employee->full_name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Lets this account view its own payslips in the employee portal.</div>
+                            @error('employee_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         <button type="submit" class="btn btn-primary btn-sm">Save</button>
                     </form>
 

@@ -61,6 +61,11 @@ class PayrollItem extends Model
         return $this->hasMany(PayrollItemContribution::class);
     }
 
+    public function accessLogs(): HasMany
+    {
+        return $this->hasMany(PayslipAccessLog::class);
+    }
+
     /**
      * Basic, non-blocking sanity checks surfaced on the period/item show
      * pages -- Phase 11 has nowhere to attach a hard block (Approve/

@@ -6,6 +6,7 @@ namespace App\Models;
 use App\Enums\DefaultRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -32,6 +33,7 @@ class User extends Authenticatable
         'email',
         'password',
         'disabled_at',
+        'employee_id',
     ];
 
     /**
@@ -70,5 +72,10 @@ class User extends Authenticatable
     public function isSuperadmin(): bool
     {
         return $this->hasRole(DefaultRole::Superadmin->value);
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
     }
 }

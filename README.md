@@ -64,11 +64,14 @@ daily attendance with audit-logged corrections, overtime approval, and
 an attendance summary report), Phase 9 (Leave Management — leave
 types/policies, an audit-ledger balance system, and leave requests with
 submit/approve/reject/cancel), Phase 10 (Compensation — salary
-structures/grades, allowances/bonuses/incentives), and Phase 11 (Payroll
+structures/grades, allowances/bonuses/incentives), Phase 11 (Payroll
 Engine — versioned government contribution/tax rate tables, payroll
 groups/periods, a calculation engine producing per-employee payroll
 items with earnings/contributions/tax, and manual adjustments with
-validation flags) are in place — see the
+validation flags), and Phase 12 (Payroll Approval & Digital Payslip —
+review/approve/finalize/lock/publish, a downloadable payslip PDF, and a
+minimal employee portal for viewing/downloading published payslips with
+access logging and an email notification) are in place — see the
 dashboard's build-status panel or `CLAUDE.md` for what's done and what's
 next. The
 system is built in phases per

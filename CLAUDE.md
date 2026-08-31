@@ -151,18 +151,23 @@ non-negotiable — don't relax these for convenience):
   policy data to compute them from yet). See Payroll below before
   touching any of this — it consolidates several of blueprint's
   suggested tables the same way Compensation and Organization did.
-- Phase 12 (partial) — Payroll Approval & Digital Payslip: the rest of
-  the state machine (`ForReview` → `ForApproval` → `Approved` →
-  `Finalized` → `Locked` → `Published`, following blueprint §14's
-  lifecycle diagram order rather than §15's bare list order, which
-  disagree on where Published sits), each transition a guarded action on
+- Phase 12 — Payroll Approval & Digital Payslip: the rest of the state
+  machine (`ForReview` → `ForApproval` → `Approved` → `Finalized` →
+  `Locked` → `Published`, following blueprint §14's lifecycle diagram
+  order rather than §15's bare list order, which disagree on where
+  Published sits), each transition a guarded action on
   `PayrollPeriodController`, reject-with-reason sending a period back to
-  `ForReview` rather than `Draft`. Payslip generation, PDF generation,
-  the digital payslip portal, payslip access logging, and employee
-  notifications are not started yet — see Payroll Approval below.
+  `ForReview` rather than `Draft`; a payslip PDF (`barryvdh/laravel-
+  dompdf`, no separate `Payslip` tables — a `PayrollItem` already holds
+  everything one needs) downloadable by admins from `Finalized` onward
+  and by an employee, from the new minimal portal at `/portal`, only
+  once their own period is `Published`; `users.employee_id` (the
+  previously-missing link blueprint §17's ownership rule depends on);
+  and `payslip_access_logs` plus a `PayslipPublished` notification. See
+  Payroll Approval and Digital Payslip Portal below.
 
-**Not started:** the remainder of Phase 12, then Phase 13 onward through
-Phase 18. Follow the phase order in blueprint §54/§59; don't
+**Not started:** Phase 13 (Employee & Manager Self-Service) onward
+through Phase 18. Follow the phase order in blueprint §54/§59; don't
 jump ahead to a later phase's tables/UI before its dependencies exist.
 Re-read the relevant blueprint section before starting a phase — this
 file is a summary, not a substitute.
@@ -932,6 +937,75 @@ render correctly (they're in the font's encoding); only the true minus
 sign isn't. Fixed by using a plain ASCII hyphen (`-`) instead. Worth
 remembering for any future PDF template: don't assume an HTML entity
 that renders fine in Chrome renders the same way through dompdf.
+
+## Digital Payslip Portal (Phase 12, completed)
+
+Phase 12 is done: the state machine (12a), payslip PDF (12b), and this
+slice (12c) -- a minimal employee-facing portal, `users.employee_id`,
+payslip access logging, and a publish notification.
+
+**`users.employee_id`** (nullable, unique, new migration) is the piece
+blueprint §17's `payslip.employee_id === auth()->user()->employee_id`
+rule depends on and that genuinely didn't exist anywhere in the app
+before now -- confirmed by grepping every migration before writing this
+one. An admin links an account to its `Employee` record from the
+existing Users create/edit forms (`UserController::linkableEmployees()`
+excludes employees already claimed by a *different* user, so the
+dropdown can't create a duplicate link; the DB unique index is the
+actual guarantee, the query is just so the form doesn't offer a
+guaranteed-to-fail option). Deliberately mass-assignable (unlike
+`is_system_account`/`is_protected`) -- linking an account to an employee
+isn't a protection escalation, it's routine admin data entry, so it
+belongs on `$fillable` like `disabled_at` does.
+
+**A real bug caught before shipping, not by a browser but by the
+existing test suite**: `$validated['employee_id'] ?: null` in both
+`store()` and `update()` threw `Undefined array key "employee_id"`
+against `UserManagementTest`'s existing create-user test, which (like a
+real HTML form whose `<select>` always submits *something*, even
+`employee_id=""`) doesn't build the exact shape `?:` assumed -- it never
+sends the key at all. `nullable` validation doesn't guarantee the key
+exists in `$validated`; it only skips *other* rules when absent. Fixed
+to `($validated['employee_id'] ?? null) ?: null` -- `??` handles the
+key being entirely missing, `?:` handles it being present but an empty
+string (what a real "None" `<select>` submits). Worth remembering
+anywhere else a nullable `<select>`-backed FK gets this treatment.
+
+**No full employee self-service portal** -- blueprint §41's sidebar
+(`layouts/partials/portal-sidebar.blade.php`) is built out in full as
+static placeholders, same "real link where it's built, disabled
+elsewhere" convention as the admin sidebar, but only **My Payslips**
+under Payroll is real. Profile, Employment, Attendance, Leave, and
+everything else on that sidebar are blueprint §18's bullets, which are
+Phase 13's job ("Employee & Manager Self-Service"), not Phase 12's
+("digital payslip portal" specifically) -- don't build ahead of that
+phase just because the sidebar shape is already there.
+
+**Portal ownership check has no permission-based bypass**, unlike
+blueprint §17's literal wording ("`payslip.employee_id ===
+auth()->user()->employee_id` *unless the user has an appropriate payroll
+permission*"). `PayslipController::authorizeOwnership()` only checks the
+ID match. That's intentional, not a shortcut: a `payroll.export` holder
+already has their own separate, fully-featured route to any payslip
+(`PayrollItemController::downloadPayslip()`, Phase 12b) -- replicating
+the bypass here would just be a second, less-audited path to the same
+data. `PayslipPortalTest::test_admin_payroll_permissions_do_not_bypass
+_portal_ownership()` pins this down explicitly so it can't regress into
+"simpler" by accident.
+
+**`payslip_access_logs`** records `viewed` (on `show()`) and
+`downloaded` (on `download()`) -- blueprint §17 also lists "printed" and
+"exported", which aren't real actions this app has (printing is a
+browser feature no server-side code sees; "exported" would only apply
+to the admin's separate CSV/bulk-export tooling, not the single-payslip
+routes here), so the enum only has the two it can actually produce.
+
+**`PayslipPublished` notification** fires once per employee when their
+period is published (`PayrollPeriodController::publish()`, after the
+status update, looping `payrollItems` eager-loaded with `employee.user`
+and skipping employees with no linked account) -- same `Queueable`-but-
+not-`ShouldQueue` shape as `SecurityAlert`, sent via the same `$user->
+notify(...)` call site convention rather than `notifyNow()`.
 
 ## Commands
 
