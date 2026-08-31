@@ -2,6 +2,8 @@
 
 @php
     $items = [
+        'payroll-periods' => 'Payroll Periods',
+        'payroll-groups' => 'Payroll Groups',
         'contribution-rate-tables' => 'Contribution Rates',
         'tax-tables' => 'Tax Tables',
     ];

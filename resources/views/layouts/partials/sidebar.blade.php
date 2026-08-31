@@ -51,7 +51,16 @@
             ],
             'PAYROLL' => [
                 'Payroll' => null,
-                'Payroll Periods' => null,
+                'Payroll Periods' => [
+                    'route' => 'admin.payroll.payroll-periods.index',
+                    'can' => ['payroll.view'],
+                    'active' => ['admin.payroll.payroll-periods.*'],
+                ],
+                'Payroll Groups' => [
+                    'route' => 'admin.payroll.payroll-groups.index',
+                    'can' => ['payroll.view'],
+                    'active' => ['admin.payroll.payroll-groups.*'],
+                ],
                 'Government Rates' => [
                     'route' => 'admin.payroll.contribution-rate-tables.index',
                     'can' => ['payroll.view'],

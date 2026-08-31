@@ -114,4 +114,14 @@ class Company extends Model
     {
         return $this->hasMany(TaxTable::class);
     }
+
+    public function payrollGroups(): HasMany
+    {
+        return $this->hasMany(PayrollGroup::class);
+    }
+
+    public function payrollPeriods(): HasMany
+    {
+        return $this->hasMany(PayrollPeriod::class);
+    }
 }

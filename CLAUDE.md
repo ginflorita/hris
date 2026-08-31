@@ -620,6 +620,35 @@ salary-band decision:
   contribution-rate-tables index; "Payroll" and "Payroll Periods" stay
   placeholders until Phase 11b.
 
+**Payroll Groups + Periods — the second slice.** `PayrollGroup` (company,
+name, code, `pay_frequency` enum, active flag) is a plain company-scoped
+lookup, same shape and same code-uniqueness-per-company pattern as
+`LeaveType`/`Holiday`. `PayrollPeriod` (company, `payroll_group_id`, name,
+start/end/pay dates, `status`) is where blueprint §15's full 9-state
+machine (`App\Enums\PayrollPeriodStatus`) first gets a real column to live
+in — but Phase 11 only ever writes `Draft` to it; `Processing` through
+`Cancelled` are reserved enum cases with no code that transitions into
+them yet (same "the row/case exists before the phase that drives it"
+pattern as the permission catalog and `LeaveTransactionType::Accrual`).
+That single fact — nothing past `Draft` exists yet — is also *why* edit
+and delete on a period both hard-block once `status !== Draft`
+(checked in the controller, not just hidden in the UI): once Phase 11c
+starts generating `PayrollItem` rows against a period, silently letting
+its dates or group change out from under those rows would be exactly the
+"overwrite instead of append/guard" mistake CLAUDE.md's payroll rules
+exist to prevent, even though the guard has to live here, ahead of the
+calculation engine that makes it matter.
+
+**Two periods in the same payroll group can't have overlapping date
+ranges** — enforced with a closure validation rule
+(`PayrollPeriodController::noOverlapRule()`) rather than a `Rule::unique`
+or a DB constraint, since "overlap" is a range comparison
+(`start <= other.end AND end >= other.start`) that neither can express.
+Cancelled periods are excluded from the check (a cancelled period
+shouldn't block reusing its date range), and the rule ignores the period
+being edited on update the same way `Rule::unique(...)->ignore()` does
+elsewhere.
+
 ## Commands
 
 ```
