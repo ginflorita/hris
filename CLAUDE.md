@@ -883,6 +883,56 @@ correctly on first Playwright pass, likely because they reuse the exact
 same form/modal/status-badge patterns already proven out in 11c/11d
 rather than introducing new UI mechanics.
 
+## Payslip PDF (Phase 12, continued)
+
+`barryvdh/laravel-dompdf` (pure-PHP rendering, no external binary like
+wkhtmltopdf to install) generates a payslip PDF from
+`resources/views/payroll/payslip-pdf.blade.php` -- a standalone HTML
+document, not `@extends('layouts.admin')`, since it's rendered by
+dompdf rather than a browser.
+
+**No `Payslip`/`PayslipItem` tables, despite blueprint's ERD listing
+them separately from `payroll_runs`/`payroll_run_employees`.** A
+`PayrollItem` (+ its `PayrollItemLine`s and `PayrollItemContribution`s)
+already holds everything blueprint §16 lists as payslip content --
+generating a payslip is a rendering concern against existing data, not a
+second copy of it. Same reasoning as Phase 11c's `payroll_runs`
+consolidation.
+
+**The payslip PDF's Deductions section deliberately differs from the
+admin item-detail page's Government Contributions card**: the PDF shows
+only the *employee* share of each contribution (SSS/PhilHealth/Pag-IBIG
+each as one deduction line) plus tax and other deductions, matching
+blueprint §16's own "Payslip Deductions" list exactly -- an employer's
+matching contribution is a cost to the company, not something deducted
+from the employee, so it has no business appearing on their payslip even
+though the admin-facing page correctly shows both shares for the
+payroll team's own accounting view.
+
+**Eligible for download starting at `Finalized`, through `Locked` and
+`Published`** (`PayrollItemController::PAYSLIP_ELIGIBLE_STATUSES`),
+gated by `payroll.export`. Blueprint §14's lifecycle diagram places
+"Generate Payslips" between Lock and Publish; allowing it from
+`Finalized` gives payroll admins a preview window on the now-immutable,
+official numbers before the employee-facing Publish step -- this route
+is admin-only (`payroll.export`), so there's no risk of an employee
+seeing an unpublished payslip through it. The actual employee-facing
+"only after Published, only my own" rule is Phase 12c's job once the
+portal exists.
+
+**Bug caught by browser verification, fixed before shipping:** the
+Total Deductions row used the HTML entity `&minus;` (U+2212, the true
+mathematical minus sign) for the leading sign, copying the convention
+used throughout the admin Bootstrap views. Those render fine in a real
+browser, but dompdf's default core Helvetica font doesn't carry that
+glyph and silently substituted "?" in the rendered PDF -- caught by
+reading the actual downloaded PDF's extracted text, not just eyeballing
+the HTML template. `&ndash;`/`&middot;` elsewhere on the same page
+render correctly (they're in the font's encoding); only the true minus
+sign isn't. Fixed by using a plain ASCII hyphen (`-`) instead. Worth
+remembering for any future PDF template: don't assume an HTML entity
+that renders fine in Chrome renders the same way through dompdf.
+
 ## Commands
 
 ```

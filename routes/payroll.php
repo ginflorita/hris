@@ -31,6 +31,8 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
 
         Route::get('payroll-items/{payroll_item}', [PayrollItemController::class, 'show'])
             ->name('payroll-items.show');
+        Route::get('payroll-items/{payroll_item}/payslip', [PayrollItemController::class, 'downloadPayslip'])
+            ->name('payroll-items.payslip');
         Route::post('payroll-items/{payroll_item}/adjustments', [PayrollItemAdjustmentController::class, 'store'])
             ->name('payroll-items.adjustments.store');
         Route::delete('payroll-items/{payroll_item}/adjustments/{line}', [PayrollItemAdjustmentController::class, 'destroy'])

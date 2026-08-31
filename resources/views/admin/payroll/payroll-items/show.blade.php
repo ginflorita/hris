@@ -10,6 +10,7 @@
 ])
 
 @php($reviewable = $payrollItem->payrollPeriod->status === \App\Enums\PayrollPeriodStatus::ForReview)
+@php($payslipReady = in_array($payrollItem->payrollPeriod->status, [\App\Enums\PayrollPeriodStatus::Finalized, \App\Enums\PayrollPeriodStatus::Locked, \App\Enums\PayrollPeriodStatus::Published], true))
 @php($issues = $payrollItem->validationIssues())
 
 @section('content')
@@ -23,11 +24,18 @@
                     &middot; Computed {{ $payrollItem->computed_at->format('M d, Y g:i A') }}
                 </div>
             </div>
-            @can('payroll.create')
-                @if ($reviewable)
-                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAdjustmentModal">Add adjustment</button>
-                @endif
-            @endcan
+            <div class="d-flex gap-2">
+                @can('payroll.export')
+                    @if ($payslipReady)
+                        <a href="{{ route('admin.payroll.payroll-items.payslip', $payrollItem) }}" class="btn btn-outline-secondary btn-sm">Download payslip PDF</a>
+                    @endif
+                @endcan
+                @can('payroll.create')
+                    @if ($reviewable)
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAdjustmentModal">Add adjustment</button>
+                    @endif
+                @endcan
+            </div>
         </div>
     </div>
 
