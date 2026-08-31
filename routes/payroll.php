@@ -16,6 +16,18 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
         Route::resource('payroll-periods', PayrollPeriodController::class);
         Route::post('payroll-periods/{payroll_period}/process', [PayrollPeriodController::class, 'process'])
             ->name('payroll-periods.process');
+        Route::post('payroll-periods/{payroll_period}/submit-for-approval', [PayrollPeriodController::class, 'submitForApproval'])
+            ->name('payroll-periods.submit-for-approval');
+        Route::post('payroll-periods/{payroll_period}/approve', [PayrollPeriodController::class, 'approve'])
+            ->name('payroll-periods.approve');
+        Route::post('payroll-periods/{payroll_period}/reject', [PayrollPeriodController::class, 'reject'])
+            ->name('payroll-periods.reject');
+        Route::post('payroll-periods/{payroll_period}/finalize', [PayrollPeriodController::class, 'finalize'])
+            ->name('payroll-periods.finalize');
+        Route::post('payroll-periods/{payroll_period}/lock', [PayrollPeriodController::class, 'lock'])
+            ->name('payroll-periods.lock');
+        Route::post('payroll-periods/{payroll_period}/publish', [PayrollPeriodController::class, 'publish'])
+            ->name('payroll-periods.publish');
 
         Route::get('payroll-items/{payroll_item}', [PayrollItemController::class, 'show'])
             ->name('payroll-items.show');

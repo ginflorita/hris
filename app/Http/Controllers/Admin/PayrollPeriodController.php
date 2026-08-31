@@ -50,7 +50,9 @@ class PayrollPeriodController extends Controller
         $this->authorize('payroll.view');
 
         return view('admin.payroll.payroll-periods.show', [
-            'payrollPeriod' => $payrollPeriod->load(['company', 'payrollGroup', 'processedBy']),
+            'payrollPeriod' => $payrollPeriod->load([
+                'company', 'payrollGroup', 'processedBy', 'submittedBy', 'approvedBy', 'finalizedBy', 'lockedBy', 'publishedBy',
+            ]),
             'payrollItems' => $payrollPeriod->payrollItems()->with('employee')->orderBy('employee_id')->get(),
         ]);
     }
@@ -67,6 +69,110 @@ class PayrollPeriodController extends Controller
 
         return redirect()->route('admin.payroll.payroll-periods.show', $payrollPeriod)
             ->with('status', "Processed {$count} employee(s). Period is now For Review.");
+    }
+
+    /**
+     * ForReview -> ForApproval: the reviewer is done (adjustments, if
+     * any, are made -- see PayrollItemAdjustmentController) and hands
+     * the period to an approver. No recalculation happens here.
+     */
+    public function submitForApproval(PayrollPeriod $payrollPeriod): RedirectResponse
+    {
+        $this->authorize('payroll.process');
+        abort_unless($payrollPeriod->status === PayrollPeriodStatus::ForReview, 422, 'Only a period For Review can be submitted for approval.');
+
+        $payrollPeriod->update([
+            'status' => PayrollPeriodStatus::ForApproval,
+            'submitted_for_approval_at' => now(),
+            'submitted_by' => request()->user()->id,
+        ]);
+
+        return back()->with('status', 'Submitted for approval.');
+    }
+
+    public function approve(PayrollPeriod $payrollPeriod): RedirectResponse
+    {
+        $this->authorize('payroll.approve');
+        abort_unless($payrollPeriod->status === PayrollPeriodStatus::ForApproval, 422, 'Only a period For Approval can be approved.');
+
+        $payrollPeriod->update([
+            'status' => PayrollPeriodStatus::Approved,
+            'approved_at' => now(),
+            'approved_by' => request()->user()->id,
+            'rejection_reason' => null,
+        ]);
+
+        return back()->with('status', 'Payroll period approved.');
+    }
+
+    /**
+     * Sends the period back to ForReview (not all the way to Draft) --
+     * adjustments and Reprocess are both still available there, so a
+     * rejected period is immediately actionable again.
+     */
+    public function reject(Request $request, PayrollPeriod $payrollPeriod): RedirectResponse
+    {
+        $this->authorize('payroll.approve');
+        abort_unless($payrollPeriod->status === PayrollPeriodStatus::ForApproval, 422, 'Only a period For Approval can be rejected.');
+
+        $validated = $request->validate(['rejection_reason' => ['required', 'string', 'max:500']]);
+
+        $payrollPeriod->update([
+            'status' => PayrollPeriodStatus::ForReview,
+            'rejection_reason' => $validated['rejection_reason'],
+        ]);
+
+        return back()->with('status', 'Payroll period sent back for review.');
+    }
+
+    public function finalize(PayrollPeriod $payrollPeriod): RedirectResponse
+    {
+        $this->authorize('payroll.finalize');
+        abort_unless($payrollPeriod->status === PayrollPeriodStatus::Approved, 422, 'Only an approved period can be finalized.');
+
+        $payrollPeriod->update([
+            'status' => PayrollPeriodStatus::Finalized,
+            'finalized_at' => now(),
+            'finalized_by' => request()->user()->id,
+        ]);
+
+        return back()->with('status', 'Payroll period finalized -- it is now immutable.');
+    }
+
+    public function lock(PayrollPeriod $payrollPeriod): RedirectResponse
+    {
+        $this->authorize('payroll.lock');
+        abort_unless($payrollPeriod->status === PayrollPeriodStatus::Finalized, 422, 'Only a finalized period can be locked.');
+
+        $payrollPeriod->update([
+            'status' => PayrollPeriodStatus::Locked,
+            'locked_at' => now(),
+            'locked_by' => request()->user()->id,
+        ]);
+
+        return back()->with('status', 'Payroll period locked.');
+    }
+
+    /**
+     * Makes this period's PayrollItems visible to employees as payslips
+     * (Phase 12's digital payslip portal reads Published periods only).
+     * Reuses payroll.lock -- the seeded catalog has no dedicated
+     * "publish" permission and Publish immediately follows Lock in
+     * blueprint §14's lifecycle diagram, so it's the same actor/step in
+     * practice.
+     */
+    public function publish(PayrollPeriod $payrollPeriod): RedirectResponse
+    {
+        $this->authorize('payroll.lock');
+        abort_unless($payrollPeriod->status === PayrollPeriodStatus::Locked, 422, 'Only a locked period can be published.');
+
+        $payrollPeriod->update([
+            'status' => PayrollPeriodStatus::Published,
+            'published_at' => now(),
+            'published_by' => request()->user()->id,
+        ]);
+
+        return back()->with('status', 'Payroll period published -- payslips are now visible to employees.');
     }
 
     public function edit(PayrollPeriod $payrollPeriod): View

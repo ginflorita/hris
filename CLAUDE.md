@@ -151,9 +151,18 @@ non-negotiable — don't relax these for convenience):
   policy data to compute them from yet). See Payroll below before
   touching any of this — it consolidates several of blueprint's
   suggested tables the same way Compensation and Organization did.
+- Phase 12 (partial) — Payroll Approval & Digital Payslip: the rest of
+  the state machine (`ForReview` → `ForApproval` → `Approved` →
+  `Finalized` → `Locked` → `Published`, following blueprint §14's
+  lifecycle diagram order rather than §15's bare list order, which
+  disagree on where Published sits), each transition a guarded action on
+  `PayrollPeriodController`, reject-with-reason sending a period back to
+  `ForReview` rather than `Draft`. Payslip generation, PDF generation,
+  the digital payslip portal, payslip access logging, and employee
+  notifications are not started yet — see Payroll Approval below.
 
-**Not started:** Phase 12 (Payroll Approval & Digital Payslip) onward,
-through Phase 18. Follow the phase order in blueprint §54/§59; don't
+**Not started:** the remainder of Phase 12, then Phase 13 onward through
+Phase 18. Follow the phase order in blueprint §54/§59; don't
 jump ahead to a later phase's tables/UI before its dependencies exist.
 Re-read the relevant blueprint section before starting a phase — this
 file is a summary, not a substitute.
@@ -805,6 +814,74 @@ adjustments and validation (11d). Everything through `ForReview` works;
 Review/Approve/Finalize/Lock/Publish and payslip generation are Phase
 12's job, per blueprint §54's own phase split — don't start building
 those without re-reading that section first.
+
+## Payroll Approval (Phase 12, in progress)
+
+Phase 12 is "Payroll Approval & Digital Payslip" — review/approval/
+finalization/locking are done (this section); payslip generation, PDF
+generation, the digital payslip portal, payslip access logging, and
+employee notifications are still ahead. See Status above for exactly
+which bullets are done.
+
+**The rest of blueprint §15's state machine is wired up, in the order
+blueprint §14's lifecycle diagram gives (Approve → Finalize → Lock →
+Generate Payslips → Publish), not the bare list order §15 itself
+happens to print (which shows Published before Locked).** The two
+sections disagree on where Published sits; the lifecycle diagram is the
+more detailed, intentional source, so that's the one this app follows —
+worth knowing if you're cross-checking against §15 directly. Concretely:
+`ForReview` -[Submit for approval]-> `ForApproval` -[Approve]->
+`Approved` -[Finalize]-> `Finalized` -[Lock]-> `Locked` -[Publish]->
+`Published`. All six transitions live as plain guarded actions directly
+on `PayrollPeriodController` (`abort_unless` on the expected prior
+status), the same shape as `LeaveRequestController::approve()`/
+`reject()` — CLAUDE.md's "payroll logic never lives in controllers" rule
+is about *calculation* math (that's `PayrollCalculationService`'s job),
+not simple state-guarded status changes, so there was nothing to extract
+into a service here.
+
+**Reject sends `ForApproval` back to `ForReview`, not to `Draft`.**
+`ForReview` is already the state where adjustments and Reprocess are
+both available (Phase 11c/11d), so a rejected period is immediately
+actionable again without losing anything or forcing a from-scratch
+redo. Rejecting requires a reason (`rejection_reason`, same required-
+string-reason pattern as `LeaveRequestController::reject()`), shown as
+a banner on the period's show page once it's back in `ForReview`.
+
+**No dedicated `payroll.review` or `payroll.publish` permission exists
+in the seeded catalog** (it only has view/create/process/approve/
+finalize/lock/export), so `submitForApproval()` reuses `payroll.process`
+(review is still part of the process/review workflow that got the
+period into `ForReview` in the first place) and `publish()` reuses
+`payroll.lock` (Publish immediately follows Lock in the lifecycle
+diagram, and there's no separate permission carved out for it) — the
+same "reuse an existing name, document why" move Compensation made for
+`organization.manage`.
+
+**Eight new audit columns on `payroll_periods`** (`submitted_for_
+approval_at`/`submitted_by`, `approved_at`/`approved_by`, `rejection_
+reason`, `finalized_at`/`finalized_by`, `locked_at`/`locked_by`,
+`published_at`/`published_by`) via a new migration on the existing
+table, same precedent as `processed_at`/`processed_by` in Phase 11c.
+No new tables — `PayrollPeriod` already has everywhere the audit trail
+needs to live.
+
+**Finalize is where CLAUDE.md's "payroll is immutable once finalized"
+rule actually starts biting** — and it required no new guard code to
+enforce, because Phase 11c/11d's guards were already written in terms
+of "not past `ForReview`": `PayrollCalculationService::process()` only
+accepts `Draft`/`ForReview`, and `PayrollItemAdjustmentController` only
+allows adjustments while `ForReview`. `Approved`, `Finalized`, `Locked`,
+and `Published` were already outside both allowed sets before this
+slice existed. Confirmed by
+`PayrollLifecycleTest::test_finalized_period_cannot_be_reprocessed()`
+rather than assumed.
+
+**Bug caught by browser verification, fixed before shipping:** none this
+slice — the lifecycle buttons and reject-reason banner all rendered
+correctly on first Playwright pass, likely because they reuse the exact
+same form/modal/status-badge patterns already proven out in 11c/11d
+rather than introducing new UI mechanics.
 
 ## Commands
 

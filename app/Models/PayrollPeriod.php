@@ -16,6 +16,11 @@ class PayrollPeriod extends Model
     protected $fillable = [
         'company_id', 'payroll_group_id', 'name', 'start_date', 'end_date', 'pay_date', 'status',
         'processed_at', 'processed_by',
+        'submitted_for_approval_at', 'submitted_by',
+        'approved_at', 'approved_by', 'rejection_reason',
+        'finalized_at', 'finalized_by',
+        'locked_at', 'locked_by',
+        'published_at', 'published_by',
     ];
 
     protected function casts(): array
@@ -26,6 +31,11 @@ class PayrollPeriod extends Model
             'pay_date' => 'date:Y-m-d',
             'status' => PayrollPeriodStatus::class,
             'processed_at' => 'datetime',
+            'submitted_for_approval_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'finalized_at' => 'datetime',
+            'locked_at' => 'datetime',
+            'published_at' => 'datetime',
         ];
     }
 
@@ -47,5 +57,30 @@ class PayrollPeriod extends Model
     public function processedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
+    }
+
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function finalizedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'finalized_by');
+    }
+
+    public function lockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    public function publishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'published_by');
     }
 }
