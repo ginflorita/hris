@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\ApplicantController;
 use App\Http\Controllers\Admin\ApplicationController;
+use App\Http\Controllers\Admin\AssessmentController;
+use App\Http\Controllers\Admin\InterviewController;
 use App\Http\Controllers\Admin\JobPostingController;
 use App\Http\Controllers\Admin\JobRequisitionController;
 use Illuminate\Support\Facades\Route;
@@ -21,5 +23,12 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
         Route::post('applicants/{applicant}/applications', [ApplicationController::class, 'store'])->name('applicants.applications.store');
 
         Route::get('applications', [ApplicationController::class, 'index'])->name('applications.index');
+        Route::get('applications/{application}', [ApplicationController::class, 'show'])->name('applications.show');
         Route::put('applications/{application}/status', [ApplicationController::class, 'updateStatus'])->name('applications.status');
+
+        Route::post('applications/{application}/interviews', [InterviewController::class, 'store'])->name('applications.interviews.store');
+        Route::put('applications/{application}/interviews/{interview}', [InterviewController::class, 'update'])->name('applications.interviews.update');
+
+        Route::post('applications/{application}/assessments', [AssessmentController::class, 'store'])->name('applications.assessments.store');
+        Route::put('applications/{application}/assessments/{assessment}', [AssessmentController::class, 'update'])->name('applications.assessments.update');
     });

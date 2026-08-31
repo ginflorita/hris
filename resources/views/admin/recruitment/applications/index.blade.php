@@ -60,7 +60,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('admin.recruitment.applicants.show', $application->applicant) }}" class="btn btn-sm btn-outline-secondary">View Applicant</a>
+                                <a href="{{ route('admin.recruitment.applications.show', $application) }}" class="btn btn-sm btn-outline-secondary">View</a>
                             </td>
                         </tr>
                     @empty

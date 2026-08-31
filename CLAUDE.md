@@ -188,11 +188,13 @@ non-negotiable — don't relax these for convenience):
   decide shape as Leave/Overtime); **Job Postings** (`draft → published
   → closed`, only creatable against an *approved* requisition);
   **Applicants** (a candidate-pool profile, deliberately not company-
-  scoped, with a private resume upload); and **Applications** (one
+  scoped, with a private resume upload); **Applications** (one
   applicant against one posting, a nine-stage pipeline status with two
-  terminal exits). See Recruitment below for what's built and the rest
-  of the pipeline still to come (Interviews, Assessments, Job Offers,
-  hiring conversion into a real Employee record, Onboarding).
+  terminal exits); and **Interviews**/**Assessments** (nested under
+  Application, both reachable from a new application show page). See
+  Recruitment below for what's built and the rest of the pipeline still
+  to come (Job Offers, hiring conversion into a real Employee record,
+  Onboarding).
 
 **Not started:** the remainder of Phase 14, then Phase 15 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1325,11 +1327,38 @@ approval chains elsewhere (Overtime, Phase 8) rather than half-building
 one ahead of it — once an application reaches a terminal status
 (`ApplicationStatus::isTerminal()`), it can't be changed again.
 
-**Not built yet**: Interviews, Assessments, Job Offers, and the
-hiring-conversion step where an accepted offer creates a real
-`Employee` + `Employment` row (the actual integration point back into
-Phase 6/7) — plus Onboarding (templates, tasks, per-hire completion
-tracking), which depends on that conversion existing first.
+**14c — Interviews + Assessments.** Both are nested under `Application`
+(not `Applicant` — the same interview round is specific to one posting's
+pipeline, not the candidate globally). `Interview` is one row per
+scheduled round: `interviewer_id` (nullable FK to `Employee`),
+`type` (`App\Enums\InterviewType`: phone screen/technical/behavioral/
+panel/final), `scheduled_at`, `location`, and — since v1 has exactly one
+interviewer per row (see 14a's note on why there's no `interviewers`
+join table) — the outcome columns (`rating` 1-5, `recommendation`,
+`feedback`) live directly on the same row rather than a separate
+evaluation table. `InterviewController::update()` handles both
+rescheduling and recording the outcome through one form/modal, since a
+single row only ever needs one edit surface.
+
+`Assessment` is simpler: `type` (`App\Enums\AssessmentType`), `due_at`,
+then `completed_at`/`score`/`passed`/`notes` filled in once a result
+comes back. `assessed_by` is stamped automatically from whoever submits
+the update *that sets `completed_at`* — there's no separate "assign a
+grader" step in v1, matching this module's general preference for one
+combined edit action over multiple narrow ones.
+
+Both live on a new `Admin\ApplicationController::show()` page (Interviews
+section, Assessments section, plus the status-update controls moved
+here from the applicant's own page now that an application has enough
+of its own related data to deserve a dedicated page) — the applicant
+profile page and the flat applications index both now link to it
+instead of hosting the status controls inline.
+
+**Not built yet**: Job Offers, and the hiring-conversion step where an
+accepted offer creates a real `Employee` + `Employment` row (the actual
+integration point back into Phase 6/7) — plus Onboarding (templates,
+tasks, per-hire completion tracking), which depends on that conversion
+existing first.
 
 ## Commands
 

@@ -7,6 +7,7 @@ use App\Enums\JobPostingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Applicant;
 use App\Models\Application;
+use App\Models\Employee;
 use App\Models\JobPosting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,6 +67,22 @@ class ApplicationController extends Controller
         ]);
 
         return redirect()->route('admin.recruitment.applicants.show', $applicant)->with('status', 'Application recorded.');
+    }
+
+    public function show(Application $application): View
+    {
+        $this->authorize('recruitment.view');
+
+        $application->load([
+            'applicant', 'jobPosting.company',
+            'interviews.interviewer',
+            'assessments.assessedBy',
+        ]);
+
+        return view('admin.recruitment.applications.show', [
+            'application' => $application,
+            'interviewers' => Employee::orderBy('last_name')->get(),
+        ]);
     }
 
     public function updateStatus(Request $request, Application $application): RedirectResponse

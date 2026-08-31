@@ -70,48 +70,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                @can('recruitment.manage')
-                                    @unless ($application->status->isTerminal())
-                                        <form method="POST" action="{{ route('admin.recruitment.applications.status', $application) }}" class="d-inline-flex gap-1">
-                                            @csrf
-                                            @method('PUT')
-                                            <select name="status" class="form-select form-select-sm" style="width: auto;">
-                                                @foreach (\App\Enums\ApplicationStatus::cases() as $case)
-                                                    @continue($case->value === 'rejected')
-                                                    <option value="{{ $case->value }}" {{ $application->status->value === $case->value ? 'selected' : '' }}>
-                                                        {{ $case->label() }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                            <button type="submit" class="btn btn-sm btn-outline-success">Update</button>
-                                        </form>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $application->id }}">Reject</button>
-
-                                        <div class="modal fade" id="rejectModal{{ $application->id }}" tabindex="-1" aria-hidden="true">
-                                            <div class="modal-dialog">
-                                                <div class="modal-content">
-                                                    <form method="POST" action="{{ route('admin.recruitment.applications.status', $application) }}">
-                                                        @csrf
-                                                        @method('PUT')
-                                                        <input type="hidden" name="status" value="rejected">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title">Reject application</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <label class="form-label">Reason</label>
-                                                            <textarea name="rejection_reason" rows="2" class="form-control" required></textarea>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-danger">Reject</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endunless
-                                @endcan
+                                <a href="{{ route('admin.recruitment.applications.show', $application) }}" class="btn btn-sm btn-outline-secondary">View</a>
                             </td>
                         </tr>
                     @empty

@@ -5,6 +5,8 @@ namespace Tests\Feature\Admin\Recruitment;
 use App\Enums\ApplicationStatus;
 use App\Models\Applicant;
 use App\Models\Application;
+use App\Models\Assessment;
+use App\Models\Interview;
 use App\Models\JobPosting;
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
@@ -111,5 +113,19 @@ class ApplicationTest extends TestCase
         $response->assertOk();
         $ids = $response->viewData('applications')->pluck('job_posting_id')->all();
         $this->assertSame([$postingA->id], $ids);
+    }
+
+    public function test_show_page_lists_interviews_and_assessments(): void
+    {
+        $user = $this->recruiter();
+        $application = Application::factory()->create();
+        Interview::factory()->forApplication($application)->create();
+        Assessment::factory()->forApplication($application)->create();
+
+        $response = $this->actingAs($user)->get(route('admin.recruitment.applications.show', $application));
+
+        $response->assertOk();
+        $this->assertCount(1, $response->viewData('application')->interviews);
+        $this->assertCount(1, $response->viewData('application')->assessments);
     }
 }
