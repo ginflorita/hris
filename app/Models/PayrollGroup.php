@@ -32,4 +32,9 @@ class PayrollGroup extends Model
     {
         return $this->hasMany(PayrollPeriod::class);
     }
+
+    public function employments(): HasMany
+    {
+        return $this->hasMany(Employment::class);
+    }
 }

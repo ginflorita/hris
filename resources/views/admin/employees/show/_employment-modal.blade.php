@@ -65,14 +65,26 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Salary grade</label>
-                        <select name="salary_grade_id" class="form-select">
-                            <option value="">None</option>
-                            @foreach ($salaryGrades as $salaryGrade)
-                                <option value="{{ $salaryGrade->id }}">{{ $salaryGrade->name }} ({{ number_format($salaryGrade->min_salary, 0) }}–{{ number_format($salaryGrade->max_salary, 0) }})</option>
-                            @endforeach
-                        </select>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Salary grade</label>
+                            <select name="salary_grade_id" class="form-select">
+                                <option value="">None</option>
+                                @foreach ($salaryGrades as $salaryGrade)
+                                    <option value="{{ $salaryGrade->id }}">{{ $salaryGrade->name }} ({{ number_format($salaryGrade->min_salary, 0) }}–{{ number_format($salaryGrade->max_salary, 0) }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Payroll group</label>
+                            <select name="payroll_group_id" class="form-select">
+                                <option value="">None</option>
+                                @foreach ($payrollGroups as $payrollGroup)
+                                    <option value="{{ $payrollGroup->id }}">{{ $payrollGroup->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Which payroll run this employee is included in.</div>
+                        </div>
                     </div>
 
                     <div class="mb-3">

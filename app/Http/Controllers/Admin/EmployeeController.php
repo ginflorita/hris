@@ -11,6 +11,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveType;
 use App\Models\Location;
+use App\Models\PayrollGroup;
 use App\Models\Position;
 use App\Models\SalaryGrade;
 use App\Models\Schedule;
@@ -88,6 +89,7 @@ class EmployeeController extends Controller
             'schedules' => Schedule::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'leaveTypes' => LeaveType::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'salaryGrades' => SalaryGrade::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'payrollGroups' => PayrollGroup::where('company_id', $employee->company_id)->orderBy('name')->get(),
         ]);
     }
 

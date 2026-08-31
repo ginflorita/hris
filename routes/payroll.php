@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ContributionRateBracketController;
 use App\Http\Controllers\Admin\ContributionRateTableController;
 use App\Http\Controllers\Admin\PayrollGroupController;
+use App\Http\Controllers\Admin\PayrollItemController;
 use App\Http\Controllers\Admin\PayrollPeriodController;
 use App\Http\Controllers\Admin\TaxTableBracketController;
 use App\Http\Controllers\Admin\TaxTableController;
@@ -11,7 +12,12 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
     ->prefix('admin/payroll')->name('admin.payroll.')->group(function () {
         Route::resource('payroll-groups', PayrollGroupController::class)->except('show');
-        Route::resource('payroll-periods', PayrollPeriodController::class)->except('show');
+        Route::resource('payroll-periods', PayrollPeriodController::class);
+        Route::post('payroll-periods/{payroll_period}/process', [PayrollPeriodController::class, 'process'])
+            ->name('payroll-periods.process');
+
+        Route::get('payroll-items/{payroll_item}', [PayrollItemController::class, 'show'])
+            ->name('payroll-items.show');
 
         Route::resource('contribution-rate-tables', ContributionRateTableController::class);
         Route::post('contribution-rate-tables/{contribution_rate_table}/brackets', [ContributionRateBracketController::class, 'store'])

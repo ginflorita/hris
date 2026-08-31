@@ -6,13 +6,17 @@ use App\Enums\PayrollPeriodStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PayrollPeriod extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['company_id', 'payroll_group_id', 'name', 'start_date', 'end_date', 'pay_date', 'status'];
+    protected $fillable = [
+        'company_id', 'payroll_group_id', 'name', 'start_date', 'end_date', 'pay_date', 'status',
+        'processed_at', 'processed_by',
+    ];
 
     protected function casts(): array
     {
@@ -21,6 +25,7 @@ class PayrollPeriod extends Model
             'end_date' => 'date:Y-m-d',
             'pay_date' => 'date:Y-m-d',
             'status' => PayrollPeriodStatus::class,
+            'processed_at' => 'datetime',
         ];
     }
 
@@ -32,5 +37,15 @@ class PayrollPeriod extends Model
     public function payrollGroup(): BelongsTo
     {
         return $this->belongsTo(PayrollGroup::class);
+    }
+
+    public function payrollItems(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
+    }
+
+    public function processedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'processed_by');
     }
 }

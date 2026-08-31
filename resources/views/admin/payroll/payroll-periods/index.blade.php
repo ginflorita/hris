@@ -34,13 +34,14 @@
                     \App\Enums\PayrollPeriodStatus::Cancelled => 'text-bg-danger',
                 })
                 <tr>
-                    <td>{{ $period->name }}</td>
+                    <td><a href="{{ route('admin.payroll.payroll-periods.show', $period) }}">{{ $period->name }}</a></td>
                     <td>{{ $period->company->name }}</td>
                     <td>{{ $period->payrollGroup->name }}</td>
                     <td>{{ $period->start_date->format('M d, Y') }} &ndash; {{ $period->end_date->format('M d, Y') }}</td>
                     <td>{{ $period->pay_date->format('M d, Y') }}</td>
                     <td><span class="badge {{ $badgeClass }}">{{ ucwords(str_replace('_', ' ', $period->status->value)) }}</span></td>
                     <td class="text-end">
+                        <a href="{{ route('admin.payroll.payroll-periods.show', $period) }}" class="btn btn-sm btn-outline-secondary">View</a>
                         @can('payroll.create')
                             @if ($period->status === \App\Enums\PayrollPeriodStatus::Draft)
                                 <a href="{{ route('admin.payroll.payroll-periods.edit', $period) }}" class="btn btn-sm btn-outline-secondary">Edit</a>

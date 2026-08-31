@@ -649,6 +649,97 @@ shouldn't block reusing its date range), and the rule ignores the period
 being edited on update the same way `Rule::unique(...)->ignore()` does
 elsewhere.
 
+**Payroll Calculation Engine — the third slice.** `App\Domain\Payroll\
+Services\PayrollCalculationService::process()` is the one place payroll
+math happens (CLAUDE.md's "payroll logic never lives in controllers"
+rule) — `PayrollPeriodController::process()` just resolves the period,
+checks `payroll.process`, and calls it. Consolidates blueprint's
+`payroll_runs`/`payroll_run_employees`/`payroll_earnings`/
+`payroll_deductions` into three tables, the same collapsing judgment call
+as Government Rules and Compensation:
+- No separate `payroll_runs` table — a period already carries `status`,
+  and recalculating a Draft/ForReview period is allowed to freely replace
+  its numbers (nothing is finalized yet, so there's no history to
+  protect), unlike the append-only pattern Employment/EmployeeSchedule
+  use for data that genuinely must stay historical. `processed_at`/
+  `processed_by` on `PayrollPeriod` itself is enough audit trail.
+- `PayrollItem` (one row per employee per period: basic salary snapshot,
+  gross earnings, contribution/tax/deduction totals, net pay) replaces
+  `payroll_run_employees`.
+- `PayrollItemLine` merges `payroll_earnings` and `payroll_deductions`
+  into one table with a `type` enum (`PayrollItemLineType::Earning`/
+  `Deduction`) plus a `category`/`label`, exactly `CompensationItem`'s
+  "they only differ by category, not structure" reasoning. It also
+  carries `is_adjustment`/`remarks`/`created_by` columns now, unused by
+  this slice but there so Phase 11d's manual adjustments (task #55) are
+  just rows on this same table instead of a fourth one — see the
+  reprocessing note below for the one thing that decision constrains.
+- `payroll_contributions` stays its own table (`PayrollItemContribution`)
+  because its shape genuinely differs (employee *and* employer amounts,
+  plus a link back to the `ContributionRateTable`/`ContributionRateBracket`
+  that produced it) — forcing that into the single-amount lines table
+  would be the same mistake in reverse.
+- No `payroll_taxes` table at all: there's exactly one tax figure per
+  employee per period (not a repeating collection like earnings/
+  deductions), so `tax_amount` + a nullable `tax_table_id` live directly
+  on `PayrollItem`.
+
+**What actually gets computed, and on what basis.** For every employee
+whose `currentEmployment.status` is Active and whose
+`currentEmployment.payroll_group_id` matches the period's group:
+`basic_salary × (12 / PayFrequency::periodsPerYear())` gives the
+period's Basic Pay (`periodsPerYear()`: 12/24/26/52 for monthly/semi-
+monthly/biweekly/weekly — the standard annualized-periods proration, the
+same factor reused for a `Monthly` `CompensationItem`; a `OneTime` or
+`Annual` item pays out in full, exactly once, in whichever period
+contains its `effective_date`, since `CompensationItem` has no
+recurrence field to hang a real "every year on this date" rule on).
+Gross earnings feed contribution and tax bracket lookups (one
+`ContributionRateTable` per agency, the most-recently-effective one
+active for the period; brackets matched against **basic pay**, i.e. the
+already-prorated period figure — not a re-derived monthly figure) and
+withholding tax (bracket matched against gross earnings minus employee
+contributions, using the company's single active `TaxTable`).
+
+**Deliberately not computed: overtime pay and holiday pay peso amounts**,
+despite being their own Phase 11 bullets in blueprint §54. Converting
+`OvertimeRequest.requested_hours` (or a holiday worked) into pesos needs
+an hourly-rate divisor and OT/holiday multipliers, and nothing in this
+app models those as data — they're real, jurisdiction-specific payroll
+policy (the Philippine convention alone has several competing "divisor"
+methods), not a universal constant. Hard-coding a multiplier here would
+be exactly the "don't bake a business-critical rate into code" mistake
+§39 exists to prevent for government rates, just for a different table.
+Same treatment as Leave's accrual scheduler: document the gap rather than
+fake it. Building this for real needs a rate-policy configuration entity
+first — a natural candidate for whichever phase next touches Payroll.
+
+**Reprocessing replaces each employee's `PayrollItem` wholesale** (delete
++ regenerate, cascading its lines/contributions) rather than diffing —
+safe today because nothing downstream depends on the old numbers and
+nothing produces an `is_adjustment` line yet. Once Phase 11d adds manual
+adjustments, reprocessing will need to preserve `is_adjustment` lines
+instead of blanket-deleting; that's Phase 11d's problem to solve, not
+this slice's.
+
+**No object-level payslip-ownership check yet** on `PayrollItemController
+::show()` — it's gated by `payroll.view` only, same as every other
+Payroll admin screen. That's fine for now because nothing employee-facing
+exists to need it: there's no self-service payslip portal until Phase 12
+("Digital payslip portal") / Phase 13 ("Employee & Manager Self-Service").
+CLAUDE.md's "every payslip access checks object-level ownership" rule
+becomes live the moment that portal exists — don't forget it then.
+
+`Employment` gained a `payroll_group_id` (nullable, via a new migration
+on the existing table — same precedent as `salary_grade_id` in Phase 10)
+rather than a field anywhere else, for the same "one source of truth for
+current state" reason CLAUDE.md's Employment section already gives for
+department/position/branch: which payroll run an employee belongs to can
+change over time (e.g. transferred from a weekly-paid role to a monthly-
+paid one), so it belongs on the effective-dated history, not a shortcut
+column on `Employee`. Set from the same "Record employment change" modal
+as salary grade.
+
 ## Commands
 
 ```

@@ -132,4 +132,9 @@ class Employee extends Model
     {
         return $this->hasMany(CompensationItem::class);
     }
+
+    public function payrollItems(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
+    }
 }

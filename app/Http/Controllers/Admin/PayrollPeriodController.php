@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Payroll\Services\PayrollCalculationService;
 use App\Enums\PayrollPeriodStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
@@ -42,6 +43,30 @@ class PayrollPeriodController extends Controller
         PayrollPeriod::create($validated);
 
         return redirect()->route('admin.payroll.payroll-periods.index')->with('status', 'Payroll period created.');
+    }
+
+    public function show(PayrollPeriod $payrollPeriod): View
+    {
+        $this->authorize('payroll.view');
+
+        return view('admin.payroll.payroll-periods.show', [
+            'payrollPeriod' => $payrollPeriod->load(['company', 'payrollGroup', 'processedBy']),
+            'payrollItems' => $payrollPeriod->payrollItems()->with('employee')->orderBy('employee_id')->get(),
+        ]);
+    }
+
+    public function process(PayrollPeriod $payrollPeriod, PayrollCalculationService $service): RedirectResponse
+    {
+        $this->authorize('payroll.process');
+
+        if (! in_array($payrollPeriod->status, [PayrollPeriodStatus::Draft, PayrollPeriodStatus::ForReview], true)) {
+            return back()->withErrors(['payrollPeriod' => 'This period can no longer be (re)processed -- it has moved past review.']);
+        }
+
+        $count = $service->process($payrollPeriod, request()->user());
+
+        return redirect()->route('admin.payroll.payroll-periods.show', $payrollPeriod)
+            ->with('status', "Processed {$count} employee(s). Period is now For Review.");
     }
 
     public function edit(PayrollPeriod $payrollPeriod): View

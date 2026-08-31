@@ -30,6 +30,7 @@ class EmploymentController extends Controller
             'department_id' => ['nullable', Rule::exists('departments', 'id')->where('company_id', $employee->company_id)],
             'position_id' => ['nullable', Rule::exists('positions', 'id')->where('company_id', $employee->company_id)],
             'salary_grade_id' => ['nullable', Rule::exists('salary_grades', 'id')->where('company_id', $employee->company_id)],
+            'payroll_group_id' => ['nullable', Rule::exists('payroll_groups', 'id')->where('company_id', $employee->company_id)],
             'branch_id' => ['nullable', Rule::exists('branches', 'id')->where('company_id', $employee->company_id)],
             'location_id' => ['nullable', Rule::exists('locations', 'id')->where('company_id', $employee->company_id)],
             'manager_id' => ['nullable', Rule::exists('employees', 'id')->where('company_id', $employee->company_id)],
