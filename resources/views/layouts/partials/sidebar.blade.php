@@ -52,6 +52,11 @@
             'PAYROLL' => [
                 'Payroll' => null,
                 'Payroll Periods' => null,
+                'Government Rates' => [
+                    'route' => 'admin.payroll.contribution-rate-tables.index',
+                    'can' => ['payroll.view'],
+                    'active' => ['admin.payroll.contribution-rate-tables.*', 'admin.payroll.tax-tables.*'],
+                ],
                 'Compensation' => [
                     'route' => 'admin.compensation.structures.index',
                     'can' => ['organization.view'],

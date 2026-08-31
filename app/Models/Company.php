@@ -104,4 +104,14 @@ class Company extends Model
     {
         return $this->hasMany(SalaryGrade::class);
     }
+
+    public function contributionRateTables(): HasMany
+    {
+        return $this->hasMany(ContributionRateTable::class);
+    }
+
+    public function taxTables(): HasMany
+    {
+        return $this->hasMany(TaxTable::class);
+    }
 }

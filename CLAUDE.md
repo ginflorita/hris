@@ -572,6 +572,54 @@ company-wide classification data, the same shape as `Position`/
 dedicated `compensation.*` permission group, that's the natural point to
 add one — don't add it speculatively here.
 
+## Payroll
+
+Phase 11 (Payroll Engine) is in progress, built in sub-slices; this
+section grows as each lands. Unlike Compensation, Payroll *does* have its
+own seeded permission group (`payroll.view`/`create`/`process`/`approve`/
+`finalize`/`lock`/`export`, all on the "Payroll Administrator" role) — use
+those rather than reusing Organization's or Employees', since the gap
+that forced Compensation's workaround doesn't exist here.
+
+**Government Rules (rate tables) — the first slice.** Blueprint §39's
+6-table recommendation (agencies, rules, rule versions, contribution
+rates, tax tables, tax brackets) is consolidated to 4 real tables plus one
+enum, the same "collapse redundant layers" judgment call as Compensation's
+salary-band decision:
+- `App\Enums\GovernmentAgency` (SSS/PhilHealth/Pag-IBIG/BIR) — a fixed,
+  small set with no fields of its own beyond a label, so it's an enum, not
+  a CRUD'able `government_agencies` table. If a real deployment ever needs
+  a fifth agency or per-agency metadata, promote it to a table then — not
+  speculatively now.
+- `ContributionRateTable` (header: company, agency, name, effective date
+  range, active flag) + `ContributionRateBracket` (child: order, min/max
+  salary, employee amount, employer amount) — one rate table's brackets
+  are managed from its `show` page via add/edit/delete modals, the same
+  pattern Phase 6 established for per-employee sub-resources (see Employee
+  above), just keyed to a rate table instead of an employee.
+- `TaxTable` + `TaxTableBracket` — identical shape, income brackets with a
+  base tax plus an excess percentage instead of flat employee/employer
+  amounts.
+- Both header tables are versioned and effective-dated (`effective_from`/
+  `effective_to`, nullable end = current), never edited over — CLAUDE.md's
+  non-negotiable "no hard-coded government contribution rates or tax
+  brackets" rule (§39) is about the *calculation code* in Phase 11c never
+  literally containing a rate; it does not forbid a seeder or admin form
+  from populating these tables with real numbers. There is deliberately no
+  seeder for this slice, though — every other phase's "sample data" (test
+  companies, employees, salary grades) has only ever been created ad hoc
+  via `tinker` for manual/browser verification, never committed as a
+  seeder, and inventing one here (especially one that would need
+  plausible-looking PH SSS/PhilHealth/Pag-IBIG/BIR figures to be useful)
+  risks those numbers being mistaken for real, current rates by whoever
+  reads the repo later. Populate real rates through the admin UI when
+  deploying for real; use factories (`ContributionRateTableFactory` etc.)
+  or `tinker` for tests/local data.
+- Sidebar: WORKFORCE's sibling **PAYROLL** section gained a real
+  **Government Rates** item (gated by `payroll.view`) pointing at the
+  contribution-rate-tables index; "Payroll" and "Payroll Periods" stay
+  placeholders until Phase 11b.
+
 ## Commands
 
 ```
