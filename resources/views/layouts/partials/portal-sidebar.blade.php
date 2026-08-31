@@ -2,10 +2,10 @@
     Employee-facing portal (blueprint §41 "Employee Portal Sidebar").
     Same "static placeholder until built" convention as the admin
     sidebar (layouts/partials/sidebar.blade.php) -- My Payslips (Phase
-    12), My Profile/Employment/Documents (13a, read-only), and My
-    Leave/Leave Request/My Overtime (13b, self-service submit + cancel)
-    are the real links so far; everything else is a later Phase 13
-    slice.
+    12), My Profile/Employment/Documents (13a, read-only), My
+    Leave/Leave Request/My Overtime (13b, self-service submit + cancel),
+    and My Attendance (13c, correction requests) are the real links so
+    far; everything else is a later Phase 13 slice.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -28,7 +28,7 @@
                 'My Employment' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
             ],
             'ATTENDANCE' => [
-                'My Attendance' => null,
+                'My Attendance' => ['route' => 'portal.attendance.index', 'active' => ['portal.attendance.*']],
                 'My Schedule' => null,
                 'My Overtime' => ['route' => 'portal.overtime.index', 'active' => ['portal.overtime.*']],
             ],

@@ -7,6 +7,7 @@
         'shifts' => 'Shifts',
         'overtime' => 'Overtime',
         'holidays' => 'Holidays',
+        'correction-requests' => 'Correction Requests',
         'report' => 'Report',
     ];
 @endphp

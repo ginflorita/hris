@@ -1073,10 +1073,38 @@ indirection for logic this short. `approve()`/`reject()` were *not*
 duplicated onto the portal side — an employee never approves their own
 leave.
 
-**Still not built**: attendance-correction requests (a genuinely new
-employee-initiated workflow, distinct from `attendance_correction_logs`,
-which is an audit trail written *during* an HR-side correction, not a
-request awaiting approval), a COE (Certificate of Employment) request +
+**13c — self-service Attendance Correction Requests.** A genuinely new
+employee-initiated workflow (`attendance_correction_requests`), distinct
+from `attendance_correction_logs`: the logs table is an audit trail
+written *during* a correction (old/new value + reason, once something
+has already changed); the new table is a request awaiting a decision
+that hasn't changed anything yet. `Portal\AttendanceController::store()`
+creates one against an `Attendance` row the caller owns
+(`attendance->employee_id === auth()->user()->employee_id`, 404
+otherwise) — an employee proposes a `requested_time_in`/
+`requested_time_out`/`requested_status` plus a reason; nothing about the
+`Attendance` row itself changes yet.
+
+The interesting design decision is on the admin side.
+`Admin\AttendanceCorrectionRequestController::approve()` doesn't
+re-implement "update the attendance row and log the change" — it calls
+the exact same `AttendanceCorrectionService::apply()` that
+`Admin\AttendanceController::update()` (a direct HR correction) already
+used, so `computeMinutes()` and the audit-logged old/new value write to
+`attendance_correction_logs` happen through one path regardless of
+whether the correction originated as an employee request or a direct HR
+edit. That service was extracted from `AttendanceController` for this
+purpose — it's the first file in the previously-empty
+`app/Domain/Attendance/`, following the same "extract once a second call
+site needs the same logic" rule `LeaveBalanceService` set in Phase 9.
+`reject()` only changes the request row's own status/reason — there's
+nothing to unwind since the attendance row was never touched. Both
+actions require `attendance.correct` (the same permission direct
+correction uses, not `attendance.manage`) and guard
+`status === Pending` so a decision can't be re-applied or reversed by
+resubmitting the form.
+
+**Still not built**: a COE (Certificate of Employment) request +
 generation flow (no `CoeRequest` table exists anywhere yet), a manager
 portal (direct-reports visibility and approvals, buildable now that
 `Employment.manager_id` plus `users.employee_id` together can resolve

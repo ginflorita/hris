@@ -53,4 +53,9 @@ class Attendance extends Model
     {
         return $this->hasMany(AttendanceCorrectionLog::class);
     }
+
+    public function correctionRequests(): HasMany
+    {
+        return $this->hasMany(AttendanceCorrectionRequest::class);
+    }
 }

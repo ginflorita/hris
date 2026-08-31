@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Portal\AttendanceController;
 use App\Http\Controllers\Portal\LeaveController;
 use App\Http\Controllers\Portal\OvertimeController;
 use App\Http\Controllers\Portal\PayslipController;
@@ -22,4 +23,7 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
 
         Route::get('overtime', [OvertimeController::class, 'index'])->name('overtime.index');
         Route::post('overtime', [OvertimeController::class, 'store'])->name('overtime.store');
+
+        Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::post('attendance/{attendance}/correction-requests', [AttendanceController::class, 'store'])->name('attendance.correction-requests.store');
     });

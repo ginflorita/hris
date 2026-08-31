@@ -113,6 +113,11 @@ class Employee extends Model
         return $this->hasMany(OvertimeRequest::class);
     }
 
+    public function attendanceCorrectionRequests(): HasMany
+    {
+        return $this->hasMany(AttendanceCorrectionRequest::class);
+    }
+
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);

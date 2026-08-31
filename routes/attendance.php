@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\AttendanceCorrectionRequestController;
 use App\Http\Controllers\Admin\AttendanceReportController;
 use App\Http\Controllers\Admin\HolidayController;
 use App\Http\Controllers\Admin\OvertimeRequestController;
@@ -18,6 +19,12 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
         Route::resource('overtime', OvertimeRequestController::class)->except(['show', 'edit', 'update', 'destroy']);
         Route::put('overtime/{overtimeRequest}/approve', [OvertimeRequestController::class, 'approve'])->name('overtime.approve');
         Route::put('overtime/{overtimeRequest}/reject', [OvertimeRequestController::class, 'reject'])->name('overtime.reject');
+
+        Route::get('correction-requests', [AttendanceCorrectionRequestController::class, 'index'])->name('correction-requests.index');
+        Route::put('correction-requests/{correction_request}/approve', [AttendanceCorrectionRequestController::class, 'approve'])
+            ->name('correction-requests.approve');
+        Route::put('correction-requests/{correction_request}/reject', [AttendanceCorrectionRequestController::class, 'reject'])
+            ->name('correction-requests.reject');
 
         Route::get('report', [AttendanceReportController::class, 'index'])->name('report.index');
     });

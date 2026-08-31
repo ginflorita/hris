@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Attendance\Services\AttendanceCorrectionService;
 use App\Enums\AttendanceSource;
 use App\Enums\AttendanceStatus;
 use App\Http\Controllers\Controller;
@@ -10,7 +11,6 @@ use App\Models\Employee;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -49,7 +49,7 @@ class AttendanceController extends Controller
         return view('admin.attendance.attendances.create', ['employees' => Employee::orderBy('last_name')->get()]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AttendanceCorrectionService $service): RedirectResponse
     {
         $this->authorize('attendance.manage');
 
@@ -71,7 +71,7 @@ class AttendanceController extends Controller
         $timeIn = $validated['time_in'] ? Carbon::parse("{$date} {$validated['time_in']}") : null;
         $timeOut = $validated['time_out'] ? Carbon::parse("{$date} {$validated['time_out']}") : null;
 
-        [$lateMinutes, $undertimeMinutes] = $this->computeMinutes($employee, $timeIn, $timeOut);
+        [$lateMinutes, $undertimeMinutes] = $service->computeMinutes($employee, $timeIn, $timeOut);
 
         Attendance::create([
             'employee_id' => $employee->id,
@@ -97,13 +97,12 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Corrections are logged, never silent — every changed field is
-     * written to attendance_correction_logs with old/new values and the
-     * given reason before the attendance row itself is updated. Never
-     * deleted/replaced (there's one row per employee per day), only
-     * corrected in place with an audit trail.
+     * Corrections are logged, never silent -- see
+     * App\Domain\Attendance\Services\AttendanceCorrectionService::apply(),
+     * the one place an Attendance row's time_in/time_out/status change
+     * after creation.
      */
-    public function update(Request $request, Attendance $attendance): RedirectResponse
+    public function update(Request $request, Attendance $attendance, AttendanceCorrectionService $service): RedirectResponse
     {
         $this->authorize('attendance.correct');
 
@@ -118,63 +117,15 @@ class AttendanceController extends Controller
         $newTimeIn = $validated['time_in'] ? Carbon::parse("{$date} {$validated['time_in']}") : null;
         $newTimeOut = $validated['time_out'] ? Carbon::parse("{$date} {$validated['time_out']}") : null;
 
-        [$lateMinutes, $undertimeMinutes] = $this->computeMinutes($attendance->employee, $newTimeIn, $newTimeOut);
-
-        $fieldChanges = [
-            'time_in' => [$attendance->time_in?->format('H:i'), $newTimeIn?->format('H:i')],
-            'time_out' => [$attendance->time_out?->format('H:i'), $newTimeOut?->format('H:i')],
-            'status' => [$attendance->status->value, $validated['status']],
-        ];
-
-        DB::transaction(function () use ($attendance, $fieldChanges, $validated, $newTimeIn, $newTimeOut, $lateMinutes, $undertimeMinutes, $request) {
-            foreach ($fieldChanges as $field => [$old, $new]) {
-                if ($old !== $new) {
-                    $attendance->correctionLogs()->create([
-                        'field' => $field,
-                        'old_value' => $old,
-                        'new_value' => $new,
-                        'reason' => $validated['reason'],
-                        'corrected_by' => $request->user()->id,
-                    ]);
-                }
-            }
-
-            $attendance->update([
-                'time_in' => $newTimeIn,
-                'time_out' => $newTimeOut,
-                'status' => $validated['status'],
-                'late_minutes' => $lateMinutes,
-                'undertime_minutes' => $undertimeMinutes,
-                'is_corrected' => true,
-                'corrected_by' => $request->user()->id,
-                'corrected_at' => now(),
-            ]);
-        });
+        $service->apply(
+            $attendance,
+            $newTimeIn,
+            $newTimeOut,
+            AttendanceStatus::from($validated['status']),
+            $validated['reason'],
+            $request->user()->id,
+        );
 
         return redirect()->route('admin.attendance.attendances.index')->with('status', 'Attendance corrected.');
-    }
-
-    /**
-     * @return array{0: int, 1: int} [late_minutes, undertime_minutes]
-     */
-    private function computeMinutes(Employee $employee, ?Carbon $timeIn, ?Carbon $timeOut): array
-    {
-        $shift = $employee->currentSchedule?->schedule?->shift;
-
-        if (! $shift || ! $timeIn) {
-            return [0, 0];
-        }
-
-        $date = $timeIn->format('Y-m-d');
-        $shiftStart = Carbon::parse("{$date} {$shift->start_time}")->addMinutes($shift->grace_minutes);
-        $lateMinutes = $timeIn->greaterThan($shiftStart) ? $timeIn->diffInMinutes($shiftStart, true) : 0;
-
-        $undertimeMinutes = 0;
-        if ($timeOut) {
-            $shiftEnd = Carbon::parse("{$date} {$shift->end_time}");
-            $undertimeMinutes = $timeOut->lessThan($shiftEnd) ? $shiftEnd->diffInMinutes($timeOut, true) : 0;
-        }
-
-        return [$lateMinutes, $undertimeMinutes];
     }
 }
