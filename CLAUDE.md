@@ -166,10 +166,12 @@ non-negotiable — don't relax these for convenience):
   and `payslip_access_logs` plus a `PayslipPublished` notification. See
   Payroll Approval and Digital Payslip Portal below.
 - Phase 13 (partial) — Employee & Manager Self-Service: read-only **My
-  Profile** in the portal (bio overview, Employment History, Documents)
-  — see Employee Self-Service below for what's built and what's still
-  missing (self-service leave/overtime/attendance-correction requests,
-  COE requests, manager portal, "Requests" aggregation).
+  Profile** in the portal (bio overview, Employment History, Documents),
+  plus self-service **My Leave**/**Leave Request**/**My Overtime**
+  (submit for oneself only, cancel a leave request with the same balance
+  -reversal logic as the admin side) — see Employee Self-Service below
+  for what's built and what's still missing (attendance-correction
+  requests, COE requests, manager portal, "Requests" aggregation).
 
 **Not started:** the remainder of Phase 13, then Phase 14 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1045,14 +1047,36 @@ sidebar shows them as placeholders (matching blueprint §41's full nav
 shape), not silently omitted, so it's clear what's planned versus what's
 out of scope for now.
 
-**Remaining Phase 13 scope, not yet built**: attendance-correction
-requests (a genuinely new employee-initiated workflow, distinct from
-`attendance_correction_logs` which is an audit trail written *during* an
-HR-side correction, not a request awaiting approval), self-service leave
-and overtime request submission (the existing `LeaveRequestController`/
-`OvertimeRequest` flows are admin-only -- `store()` lets the caller pick
-*any* `employee_id`, gated by `leave.create`, not scoped to the
-submitter's own record), a COE (Certificate of Employment) request +
+**13b — self-service Leave and Overtime request submission.**
+`Portal\LeaveController`/`Portal\OvertimeController` are new controllers,
+not extensions of `Admin\LeaveRequestController`/
+`Admin\OvertimeRequestController` — the admin `store()` actions take an
+`employee_id` field and let the caller (an HR user, gated by
+`leave.create`/`attendance.manage`) submit on behalf of *any* employee;
+retrofitting that to also serve self-service would mean either accepting
+a caller-supplied `employee_id` from a portal user (a direct object
+reference vulnerability — nothing would stop an employee editing the
+hidden field to submit as a coworker) or branching the same method on
+who's calling, which is harder to read and reason about than two small,
+separately-scoped controllers. The portal versions hard-code
+`employee_id = auth()->user()->employee_id`; there is no such input
+field on those forms. `approve()`/`reject()` stay exactly where they
+were — admin/manager-only, unchanged.
+
+`Portal\LeaveController::cancel()` duplicates
+`Admin\LeaveRequestController::cancel()`'s logic (reverse the balance via
+`LeaveBalanceService` if the request was `Approved`, otherwise a bare
+status change) rather than sharing it, for the same reason: the two
+differ only in their ownership check (any employee vs. the caller's own),
+and factoring that one line out into a shared method wasn't worth the
+indirection for logic this short. `approve()`/`reject()` were *not*
+duplicated onto the portal side — an employee never approves their own
+leave.
+
+**Still not built**: attendance-correction requests (a genuinely new
+employee-initiated workflow, distinct from `attendance_correction_logs`,
+which is an audit trail written *during* an HR-side correction, not a
+request awaiting approval), a COE (Certificate of Employment) request +
 generation flow (no `CoeRequest` table exists anywhere yet), a manager
 portal (direct-reports visibility and approvals, buildable now that
 `Employment.manager_id` plus `users.employee_id` together can resolve
