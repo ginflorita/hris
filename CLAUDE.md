@@ -183,9 +183,17 @@ non-negotiable — don't relax these for convenience):
   genuinely unbuilt because their underlying module (Benefits,
   Performance, Training) doesn't exist yet.
 
-**Not started:** Phase 14 onward through Phase 18. Follow the phase
-order in blueprint §54/§59; don't jump ahead to a later phase's
-tables/UI before its dependencies exist. Re-read the
+- Phase 14 (partial) — Recruitment & Onboarding: **Job Requisitions**
+  (headcount request, `pending → approved/rejected`, same request-then-
+  decide shape as Leave/Overtime) and **Job Postings** (`draft →
+  published → closed`, only creatable against an *approved* requisition).
+  See Recruitment below for what's built and the rest of the pipeline
+  still to come (Applicants, Applications, Interviews, Assessments, Job
+  Offers, hiring conversion into a real Employee record, Onboarding).
+
+**Not started:** the remainder of Phase 14, then Phase 15 onward through
+Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
+to a later phase's tables/UI before its dependencies exist. Re-read the
 relevant blueprint section before starting a phase — this file is a
 summary, not a substitute.
 
@@ -1226,6 +1234,64 @@ Every blueprint §18/§19 bullet buildable without a not-yet-built module
 13 is complete for what's buildable today; "View benefits/training/
 performance", "Conduct performance reviews", and "View team statistics"
 remain documented gaps waiting on their own later phases, not oversights.
+
+## Recruitment (Phase 14, in progress)
+
+Blueprint §8's applicant lifecycle (Application → Screening → Interview
+→ Assessment → Final Interview → Job Offer → Hired → Onboarding) starts
+from a posting; blueprint §54 lists Phase 14 as one phase, but it's the
+biggest single module left, so it's being built as sub-slices the same
+way Payroll (11a-11d) and Employee Self-Service (13a-13f) were.
+
+**14a — Job Requisitions + Job Postings.** A requisition
+(`job_requisitions`) is the headcount *request* — `department_id`/
+`position_id` are both nullable since a requisition can predate a formal
+position row ("we need 2 more support engineers"). It follows the exact
+same request-then-decide shape as Leave/Overtime/Attendance Correction/
+COE: `store()` always creates `Pending`, and `approve()`/`reject()` are
+the only way status moves — no `edit()`, matching how none of this
+app's other request types let you revise a submitted request either
+(resubmit a new one instead). Both actions are gated by `recruitment
+.manage`, the only manage-shaped permission the seeded catalog has for
+this module (no separate approval permission exists, unlike Leave's
+`leave.approve`/`leave.reject` split) — reusing what's seeded rather
+than inventing a new one, same rule Compensation (Phase 10) established.
+
+A posting (`job_postings`) can only be created against an **approved**
+requisition (`Rule::exists('job_requisitions','id')->where('status',
+'approved')` in `JobPostingController::store()`, not a DB constraint —
+same "app-level rule on top of the FK" approach Organization's hierarchy
+validation uses). `company_id` is denormalized onto the posting from its
+requisition, the same pattern every Organization entity uses, so postings
+can be queried/scoped without joining through `job_requisitions`. A
+posting's own lifecycle is separate from the requisition's:
+`draft → published → closed`, via `publish()`/`close()` actions
+(`published_at` stamped on publish). Editing (`title`/`description`/
+`is_internal`/`closes_at`) is unrestricted by status — blueprint doesn't
+call for locking a published posting's copy, and there's no history
+requirement here the way there is for compensation/employment data.
+
+**Consolidated away from blueprint's suggested ERD, same restraint as
+every prior phase:** no `recruitment_statuses` table — the lifecycle's
+stages are a fixed, developer-known vocabulary
+(`App\Enums\JobRequisitionStatus`, `App\Enums\JobPostingStatus`), the
+same reasoning `AttendanceStatus`/`LeaveRequestStatus`/every other
+status field in this app already uses a PHP enum instead of an
+admin-editable lookup table. No `applicant_sources` table either, for
+the same reason, once Applicants land in 14b. No `interviewers` join
+table planned for 14c — v1 is one primary interviewer per interview
+round (schedule multiple rounds for a panel instead), which also means
+no separate `interview_evaluations` table: with a single interviewer per
+row, the evaluation (score/recommendation/notes) can just be columns on
+`interviews` itself rather than a 1:1 wrapper table, the same collapsing
+`SalaryGrade`/`PayrollItem` already did for their own suggested ERDs.
+
+**Not built yet**: Applicants, Applications (the pipeline status an
+applicant is at against a specific posting), Interviews, Assessments,
+Job Offers, and the hiring-conversion step where an accepted offer
+creates a real `Employee` + `Employment` row (the actual integration
+point back into Phase 6/7) — plus Onboarding (templates, tasks, per-hire
+completion tracking), which depends on that conversion existing first.
 
 ## Commands
 
