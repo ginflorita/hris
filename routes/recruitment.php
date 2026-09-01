@@ -7,6 +7,8 @@ use App\Http\Controllers\Admin\InterviewController;
 use App\Http\Controllers\Admin\JobOfferController;
 use App\Http\Controllers\Admin\JobPostingController;
 use App\Http\Controllers\Admin\JobRequisitionController;
+use App\Http\Controllers\Admin\OnboardingTaskController;
+use App\Http\Controllers\Admin\OnboardingTemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
@@ -39,4 +41,9 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
         Route::put('applications/{application}/offers/{offer}/rescind', [JobOfferController::class, 'rescind'])->name('applications.offers.rescind');
         Route::get('applications/{application}/offers/{offer}/convert', [JobOfferController::class, 'convertForm'])->name('applications.offers.convert-form');
         Route::post('applications/{application}/offers/{offer}/convert', [JobOfferController::class, 'convert'])->name('applications.offers.convert');
+
+        Route::resource('onboarding-templates', OnboardingTemplateController::class);
+        Route::post('onboarding-templates/{onboardingTemplate}/tasks', [OnboardingTaskController::class, 'store'])->name('onboarding-templates.tasks.store');
+        Route::put('onboarding-templates/{onboardingTemplate}/tasks/{task}', [OnboardingTaskController::class, 'update'])->name('onboarding-templates.tasks.update');
+        Route::delete('onboarding-templates/{onboardingTemplate}/tasks/{task}', [OnboardingTaskController::class, 'destroy'])->name('onboarding-templates.tasks.destroy');
     });

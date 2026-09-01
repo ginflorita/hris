@@ -159,6 +159,11 @@ class Employee extends Model
         return $this->hasMany(PayrollItem::class);
     }
 
+    public function onboardings(): HasMany
+    {
+        return $this->hasMany(EmployeeOnboarding::class)->orderByDesc('created_at');
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

@@ -12,6 +12,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveType;
 use App\Models\Location;
+use App\Models\OnboardingTemplate;
 use App\Models\PayrollGroup;
 use App\Models\Position;
 use App\Models\SalaryGrade;
@@ -86,6 +87,7 @@ class EmployeeController extends Controller
             'leaveBalances' => fn ($q) => $q->with('leaveType'),
             'leaveTransactions' => fn ($q) => $q->with(['leaveType', 'createdBy'])->orderByDesc('date')->orderByDesc('id'),
             'compensationItems' => fn ($q) => $q->orderByDesc('effective_date'),
+            'onboardings' => fn ($q) => $q->with(['template', 'assignedBy', 'tasks.completedBy']),
         ]);
 
         return view('admin.employees.show', [
@@ -99,6 +101,7 @@ class EmployeeController extends Controller
             'leaveTypes' => LeaveType::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'salaryGrades' => SalaryGrade::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'payrollGroups' => PayrollGroup::where('company_id', $employee->company_id)->orderBy('name')->get(),
+            'onboardingTemplates' => OnboardingTemplate::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 

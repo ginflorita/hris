@@ -6,6 +6,7 @@
         'postings' => 'Postings',
         'applicants' => 'Applicants',
         'applications' => 'Applications',
+        'onboarding-templates' => 'Onboarding Templates',
     ];
 @endphp
 

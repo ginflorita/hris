@@ -202,7 +202,7 @@ non-negotiable — don't relax these for convenience):
   genuinely unbuilt because their underlying module (Benefits,
   Performance, Training) doesn't exist yet.
 
-- Phase 14 (partial) — Recruitment & Onboarding: **Job Requisitions**
+- Phase 14 — Recruitment & Onboarding (complete): **Job Requisitions**
   (headcount request, `pending → approved/rejected`, same request-then-
   decide shape as Leave/Overtime); **Job Postings** (`draft → published
   → closed`, only creatable against an *approved* requisition);
@@ -210,18 +210,21 @@ non-negotiable — don't relax these for convenience):
   scoped, with a private resume upload); **Applications** (one
   applicant against one posting, a nine-stage pipeline status with two
   terminal exits); **Interviews**/**Assessments** (nested under
-  Application, both reachable from a new application show page); and
+  Application, both reachable from a new application show page);
   **Job Offers** (nested under Application, `pending → accepted/
   declined/rescinded`) plus the **hiring-conversion** step where an
   accepted offer creates a real `Employee` + `Employment` row, closing
-  the loop back into Phase 6/7. See Recruitment below for the full set
-  of decisions and the one piece still ahead (Onboarding).
+  the loop back into Phase 6/7; and **Onboarding** (`OnboardingTemplate`/
+  `OnboardingTask` company-scoped checklist definitions, assigned
+  per-hire as `EmployeeOnboarding`/`EmployeeOnboardingTask` snapshots
+  with computed progress tracking, on a new Onboarding tab on the
+  employee profile page). See Recruitment below for the full set of
+  decisions.
 
-**Not started:** Onboarding (the rest of Phase 14), then Phase 15
-onward through Phase 18. Follow the phase order in blueprint §54/§59;
-don't jump ahead to a later phase's tables/UI before its dependencies
-exist. Re-read the relevant blueprint section before starting a phase —
-this file is a summary, not a substitute.
+**Not started:** Phase 15 onward through Phase 18. Follow the phase
+order in blueprint §54/§59; don't jump ahead to a later phase's tables/
+UI before its dependencies exist. Re-read the relevant blueprint section
+before starting a phase — this file is a summary, not a substitute.
 
 ## Authentication
 
@@ -1261,7 +1264,7 @@ Every blueprint §18/§19 bullet buildable without a not-yet-built module
 performance", "Conduct performance reviews", and "View team statistics"
 remain documented gaps waiting on their own later phases, not oversights.
 
-## Recruitment (Phase 14, in progress)
+## Recruitment (Phase 14, complete)
 
 Blueprint §8's applicant lifecycle (Application → Screening → Interview
 → Assessment → Final Interview → Job Offer → Hired → Onboarding) starts
@@ -1421,9 +1424,66 @@ the same "permission exists, nothing's granted it by default yet"
 pattern CLAUDE.md already documents for `organization.manage`, not a bug
 to fix here.
 
-**Not built yet**: Onboarding (templates, tasks, per-hire completion
-tracking) — it depends on hiring conversion existing first, which this
-slice now provides.
+**14e — Onboarding, closing out Phase 14.** Blueprint §9: a reusable
+checklist definition (`OnboardingTemplate` + `OnboardingTask`, company-
+scoped CRUD, same shape as `LeaveType`/`Holiday`/`PayrollGroup`) assigned
+per-hire (`EmployeeOnboarding` + `EmployeeOnboardingTask`). Assigning a
+template *copies* its tasks onto the employee's own rows rather than
+referencing the template's live rows — editing or adding to a template
+afterward never changes an already-assigned employee's checklist out
+from under them, the same snapshot principle Employee Self-Service's COE
+requests use for their own frozen `Employment` data. Blueprint's ERD
+names the third table `employee_onboarding` (singular); this app uses
+Eloquent's default pluralization (`employee_onboardings`) instead, same
+as everywhere else in the codebase — the blueprint's table names are a
+starting sketch, not a literal contract.
+
+**No status column on `EmployeeOnboarding`** — completion is computed
+(`isComplete()`/`progressPercentage()`) from whether every child task
+`is_completed`, rather than a second, independently-settable field that
+could drift out of sync with the tasks themselves. This is the same
+"compute rather than duplicate" call `Application::hasPendingJobOffer()`
+makes for its own state check. An `EmployeeOnboarding` with zero tasks
+counts as complete (nothing left to block on) rather than stuck forever.
+`is_completed` on a task is a plain boolean, not an enum — genuinely
+binary (done or not), unlike `Assessment`'s pending/passed/failed which
+needed a third state.
+
+**Two different permission groups gate the two halves of this slice, by
+shape, the same split Compensation (Phase 10) established.**
+`OnboardingTemplate`/`OnboardingTask` are company-wide configuration
+data (the same shape as `LeaveType`/`Holiday`), so they reuse
+`recruitment.view`/`recruitment.manage` — unlike Compensation, Onboarding
+*is* blueprint's own Phase 14 module alongside Recruitment, so this
+isn't even a cross-module borrow. `EmployeeOnboarding`/
+`EmployeeOnboardingTask` (assigning a checklist to a specific hire,
+checking off its tasks) are a per-employee record (the same shape as
+`Employment`/`CompensationItem`), so they reuse `employees.view`/
+`employees.update` instead, and live in `Admin\EmployeeOnboardingController`
+under the employee routes rather than the recruitment ones — onboarding
+happens post-hire, once a real `Employee` row already exists, not as
+part of the pipeline itself. At most one *incomplete* checklist per
+employee at a time (checked with the same `whereHas` pattern
+`hasPendingJobOffer()` uses, not a DB constraint); a completed one never
+blocks assigning a fresh one.
+
+The checklist itself lives as a new **Onboarding** tab on the employee
+profile page (`admin.employees.show`), reusing the exact tab-per-entity
+shape Phase 6 established — each assigned checklist is its own card with
+a progress bar, and each task row's checkbox auto-submits on change
+(`onchange="this.form.submit()"`, the same pattern the filter dropdowns
+already use elsewhere) rather than a batch "Save" button, since a
+checklist this size doesn't need one. The sidebar's long-placeholder
+TALENT > Onboarding entry (`'Onboarding' => null`, already scaffolded
+per blueprint §41's full nav shape) now points at
+`admin.recruitment.onboarding-templates.index`, the same "real link
+where it's built" convention the rest of this file already follows.
+
+Blueprint §54's Phase 14 (Job requisitions, Job postings, Applicants,
+Applications, Interviews, Assessments, Job offers, Onboarding templates,
+Onboarding tasks) is now complete end-to-end. Offboarding (blueprint
+§26) is a separate, later module — Phase 16's job, not this one's — see
+Status above before starting Phase 15.
 
 ## Commands
 

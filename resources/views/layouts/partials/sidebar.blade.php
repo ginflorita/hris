@@ -3,9 +3,9 @@
     CLAUDE.md "Status"). WORKFORCE > Employees/Organization/Positions/COE
     Requests, TIME & ATTENDANCE > Attendance/Schedules/Shifts/Overtime/
     Holidays/Leave, PAYROLL > Compensation, TALENT > Recruitment/
-    Applicants, and ADMINISTRATION > Users/Roles/Permissions are real
-    and permission-gated; the rest light up the same way as their phase
-    lands.
+    Applicants/Onboarding, and ADMINISTRATION > Users/Roles/Permissions
+    are real and permission-gated; the rest light up the same way as
+    their phase lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -87,7 +87,11 @@
                     'can' => ['recruitment.view'],
                     'active' => ['admin.recruitment.applicants.*', 'admin.recruitment.applications.*'],
                 ],
-                'Onboarding' => null,
+                'Onboarding' => [
+                    'route' => 'admin.recruitment.onboarding-templates.index',
+                    'can' => ['recruitment.view'],
+                    'active' => ['admin.recruitment.onboarding-templates.*'],
+                ],
                 'Performance' => null,
                 'Training' => null,
                 'Skills' => null,

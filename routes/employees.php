@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\EmployeeDocumentController;
 use App\Http\Controllers\Admin\EmployeeEmergencyContactController;
 use App\Http\Controllers\Admin\EmployeeGovernmentIdController;
 use App\Http\Controllers\Admin\EmployeeNoteController;
+use App\Http\Controllers\Admin\EmployeeOnboardingController;
+use App\Http\Controllers\Admin\EmployeeOnboardingTaskController;
 use App\Http\Controllers\Admin\EmployeeScheduleController;
 use App\Http\Controllers\Admin\EmploymentController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
@@ -57,5 +59,8 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::post('compensation-items', [CompensationItemController::class, 'store'])->name('compensation-items.store');
             Route::put('compensation-items/{item}', [CompensationItemController::class, 'update'])->name('compensation-items.update');
             Route::delete('compensation-items/{item}', [CompensationItemController::class, 'destroy'])->name('compensation-items.destroy');
+
+            Route::post('onboardings', [EmployeeOnboardingController::class, 'store'])->name('onboardings.store');
+            Route::put('onboardings/{onboarding}/tasks/{task}', [EmployeeOnboardingTaskController::class, 'update'])->name('onboardings.tasks.update');
         });
     });
