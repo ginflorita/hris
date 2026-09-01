@@ -221,10 +221,19 @@ non-negotiable — don't relax these for convenience):
   employee profile page). See Recruitment below for the full set of
   decisions.
 
-**Not started:** Phase 15 onward through Phase 18. Follow the phase
-order in blueprint §54/§59; don't jump ahead to a later phase's tables/
-UI before its dependencies exist. Re-read the relevant blueprint section
-before starting a phase — this file is a summary, not a substitute.
+- Phase 15 (partial) — Talent Management: **Performance Cycles**
+  (`Draft → Active → Closed`) and **Performance Goals** (per-employee,
+  nullable measurable target instead of a separate KPIs table), on a new
+  Performance tab on the employee profile page. See Talent Management
+  below for what's built and what's left (Competencies, Skills,
+  Performance Reviews, Training, Career development, Succession
+  planning).
+
+**Not started:** the remainder of Phase 15, then Phase 16 onward through
+Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
+to a later phase's tables/UI before its dependencies exist. Re-read the
+relevant blueprint section before starting a phase — this file is a
+summary, not a substitute.
 
 ## Authentication
 
@@ -1484,6 +1493,49 @@ Applications, Interviews, Assessments, Job offers, Onboarding templates,
 Onboarding tasks) is now complete end-to-end. Offboarding (blueprint
 §26) is a separate, later module — Phase 16's job, not this one's — see
 Status above before starting Phase 15.
+
+## Talent Management (Phase 15, in progress)
+
+Blueprint §54 lists Phase 15 as Performance, Goals, KPIs, Competencies,
+Skills, Training, Career development, Succession planning — built as
+sub-slices like every other multi-entity phase.
+
+**15a — Performance Cycles + Goals.** `PerformanceCycle` (company-scoped
+CRUD, same shape as `LeaveType`/`Holiday`/`PayrollGroup`) has its own
+lifecycle, `Draft → Active → Closed`, via `activate()`/`close()` actions
+rather than a freely-editable status field — the same guard shape
+`JobPosting`'s `publish()`/`close()` established, rather than
+reinventing `PayrollPeriod`'s per-module transition pattern differently
+each time. Unlike Compensation (Phase 10), Performance already has its
+own seeded permission group (`performance.view`/`performance.manage`),
+so both cycles and goals use those directly — no borrowed-permission
+workaround needed here.
+
+**No separate KPIs table**, despite blueprint §22 listing "Goals" and
+"KPIs" as separate functions — `performance_goals` carries nullable
+`target_value`/`actual_value`/`unit` columns so a goal *can* be
+KPI-like (a measurable target) without forcing every goal to have one,
+the same "one flexible table, not two near-identical ones" call
+`CompensationItem` made for allowances/bonuses/incentives. A goal
+belongs to exactly one `PerformanceCycle` (required, not nullable) —
+grouping goals by cycle gives every goal a clear time boundary, the
+same reasoning `CompensationItem` needs an effective/end date.
+
+`PerformanceGoal` is managed from a new **Performance** tab on the
+employee profile page (`admin.employees.show`), the same nested-
+controller-plus-modal shape Phase 6 established for per-employee sub-
+resources (`EmployeePerformanceGoalController`, routes under
+`admin.employees.performance-goals.*`) — status
+(`NotStarted`/`InProgress`/`Completed`/`Cancelled`, a plain enum since
+it's genuinely discrete, unlike `Assessment`'s pending/passed/failed
+which needed a third state for a different reason) is edited alongside
+the goal's own fields in the same edit modal, not a separate action.
+
+**Not built yet**: Competencies, Skills, Performance Reviews/Ratings/
+Comments (self/manager/peer review submission — blueprint §22's other
+half of Performance Management), Training (catalog, sessions,
+enrollment, attendance, certificates — blueprint §23), Career
+development, Succession planning.
 
 ## Commands
 

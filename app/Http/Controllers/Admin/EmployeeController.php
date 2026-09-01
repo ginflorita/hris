@@ -14,6 +14,7 @@ use App\Models\LeaveType;
 use App\Models\Location;
 use App\Models\OnboardingTemplate;
 use App\Models\PayrollGroup;
+use App\Models\PerformanceCycle;
 use App\Models\Position;
 use App\Models\SalaryGrade;
 use App\Models\Schedule;
@@ -88,6 +89,7 @@ class EmployeeController extends Controller
             'leaveTransactions' => fn ($q) => $q->with(['leaveType', 'createdBy'])->orderByDesc('date')->orderByDesc('id'),
             'compensationItems' => fn ($q) => $q->orderByDesc('effective_date'),
             'onboardings' => fn ($q) => $q->with(['template', 'assignedBy', 'tasks.completedBy']),
+            'performanceGoals' => fn ($q) => $q->with('performanceCycle'),
         ]);
 
         return view('admin.employees.show', [
@@ -102,6 +104,7 @@ class EmployeeController extends Controller
             'salaryGrades' => SalaryGrade::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'payrollGroups' => PayrollGroup::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'onboardingTemplates' => OnboardingTemplate::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
+            'performanceCycles' => PerformanceCycle::where('company_id', $employee->company_id)->orderByDesc('start_date')->get(),
         ]);
     }
 

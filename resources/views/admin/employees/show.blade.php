@@ -68,6 +68,7 @@
             'documents' => 'Documents',
             'notes' => 'Notes',
             'onboarding' => 'Onboarding',
+            'performance' => 'Performance',
         ] as $tabId => $tabLabel)
             <li class="nav-item" role="presentation">
                 <button class="nav-link {{ $loop->first ? 'active' : '' }}" id="{{ $tabId }}-tab" data-bs-toggle="tab"
@@ -112,6 +113,9 @@
         </div>
         <div class="tab-pane fade" id="onboarding" role="tabpanel">
             @include('admin.employees.show._onboarding')
+        </div>
+        <div class="tab-pane fade" id="performance" role="tabpanel">
+            @include('admin.employees.show._performance')
         </div>
     </div>
 @endsection

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\EmployeeGovernmentIdController;
 use App\Http\Controllers\Admin\EmployeeNoteController;
 use App\Http\Controllers\Admin\EmployeeOnboardingController;
 use App\Http\Controllers\Admin\EmployeeOnboardingTaskController;
+use App\Http\Controllers\Admin\EmployeePerformanceGoalController;
 use App\Http\Controllers\Admin\EmployeeScheduleController;
 use App\Http\Controllers\Admin\EmploymentController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
@@ -62,5 +63,9 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
 
             Route::post('onboardings', [EmployeeOnboardingController::class, 'store'])->name('onboardings.store');
             Route::put('onboardings/{onboarding}/tasks/{task}', [EmployeeOnboardingTaskController::class, 'update'])->name('onboardings.tasks.update');
+
+            Route::post('performance-goals', [EmployeePerformanceGoalController::class, 'store'])->name('performance-goals.store');
+            Route::put('performance-goals/{goal}', [EmployeePerformanceGoalController::class, 'update'])->name('performance-goals.update');
+            Route::delete('performance-goals/{goal}', [EmployeePerformanceGoalController::class, 'destroy'])->name('performance-goals.destroy');
         });
     });

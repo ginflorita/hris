@@ -92,7 +92,11 @@
                     'can' => ['recruitment.view'],
                     'active' => ['admin.recruitment.onboarding-templates.*'],
                 ],
-                'Performance' => null,
+                'Performance' => [
+                    'route' => 'admin.performance.cycles.index',
+                    'can' => ['performance.view'],
+                    'active' => ['admin.performance.*'],
+                ],
                 'Training' => null,
                 'Skills' => null,
                 'Career' => null,
