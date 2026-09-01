@@ -7,8 +7,10 @@ use App\Enums\JobPostingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Applicant;
 use App\Models\Application;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\JobPosting;
+use App\Models\Position;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -77,22 +79,42 @@ class ApplicationController extends Controller
             'applicant', 'jobPosting.company',
             'interviews.interviewer',
             'assessments.assessedBy',
+            'jobOffers.extendedBy', 'jobOffers.position', 'jobOffers.convertedEmployee',
         ]);
+
+        $companyId = $application->jobPosting->company_id;
 
         return view('admin.recruitment.applications.show', [
             'application' => $application,
             'interviewers' => Employee::orderBy('last_name')->get(),
+            'departments' => Department::where('company_id', $companyId)->orderBy('name')->get(),
+            'positions' => Position::where('company_id', $companyId)->orderBy('title')->get(),
         ]);
     }
 
+    /**
+     * Offered and Hired are excluded from the statuses this accepts --
+     * they're now driven exclusively by the JobOffer lifecycle
+     * (JobOfferController::store()/accept()) and hiring conversion
+     * (JobOfferController::convert()) respectively, so this endpoint no
+     * longer lets either be set directly. Without this, the plain PUT
+     * here could mark an application Hired with no JobOffer or Employee
+     * behind it at all.
+     */
     public function updateStatus(Request $request, Application $application): RedirectResponse
     {
         $this->authorize('recruitment.manage');
         abort_if($application->status->isTerminal(), 422, 'This application has already reached a final status.');
 
         $validated = $request->validate([
-            'status' => ['required', Rule::enum(ApplicationStatus::class)],
+            'status' => [
+                'required',
+                Rule::enum(ApplicationStatus::class),
+                Rule::notIn([ApplicationStatus::Offered->value, ApplicationStatus::Hired->value]),
+            ],
             'rejection_reason' => ['required_if:status,rejected', 'nullable', 'string', 'max:500'],
+        ], [
+            'status.not_in' => 'Offered and Hired are set by the job offer workflow, not chosen directly.',
         ]);
 
         $application->update([

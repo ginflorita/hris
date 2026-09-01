@@ -209,17 +209,19 @@ non-negotiable — don't relax these for convenience):
   **Applicants** (a candidate-pool profile, deliberately not company-
   scoped, with a private resume upload); **Applications** (one
   applicant against one posting, a nine-stage pipeline status with two
-  terminal exits); and **Interviews**/**Assessments** (nested under
-  Application, both reachable from a new application show page). See
-  Recruitment below for what's built and the rest of the pipeline still
-  to come (Job Offers, hiring conversion into a real Employee record,
-  Onboarding).
+  terminal exits); **Interviews**/**Assessments** (nested under
+  Application, both reachable from a new application show page); and
+  **Job Offers** (nested under Application, `pending → accepted/
+  declined/rescinded`) plus the **hiring-conversion** step where an
+  accepted offer creates a real `Employee` + `Employment` row, closing
+  the loop back into Phase 6/7. See Recruitment below for the full set
+  of decisions and the one piece still ahead (Onboarding).
 
-**Not started:** the remainder of Phase 14, then Phase 15 onward through
-Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
-to a later phase's tables/UI before its dependencies exist. Re-read the
-relevant blueprint section before starting a phase — this file is a
-summary, not a substitute.
+**Not started:** Onboarding (the rest of Phase 14), then Phase 15
+onward through Phase 18. Follow the phase order in blueprint §54/§59;
+don't jump ahead to a later phase's tables/UI before its dependencies
+exist. Re-read the relevant blueprint section before starting a phase —
+this file is a summary, not a substitute.
 
 ## Authentication
 
@@ -1373,11 +1375,55 @@ of its own related data to deserve a dedicated page) — the applicant
 profile page and the flat applications index both now link to it
 instead of hosting the status controls inline.
 
-**Not built yet**: Job Offers, and the hiring-conversion step where an
-accepted offer creates a real `Employee` + `Employment` row (the actual
-integration point back into Phase 6/7) — plus Onboarding (templates,
-tasks, per-hire completion tracking), which depends on that conversion
-existing first.
+**14d — Job Offers + hiring conversion.** `JobOffer` is nested under
+`Application` (not a new pipeline entity of its own) — `store()` extends
+a Pending offer and moves the Application to `Offered`; `accept()`/
+`decline()` record the candidate's decision (there's no candidate-facing
+portal, so HR records it on their behalf); `rescind()` lets HR withdraw
+an unanswered offer. At most one Pending offer per application at a
+time, enforced in `Application::hasPendingJobOffer()` rather than a DB
+constraint — the same "app-level rule on top of the FK" approach
+`PayrollPeriod`'s overlap check uses — so a declined or rescinded offer
+can always be followed by a fresh one on the same application.
+
+Because a real `JobOffer` entity now exists, `ApplicationController::
+updateStatus()` no longer accepts `offered`/`hired` as manually-chosen
+values (`Rule::notIn`, with a custom message) and the status dropdown on
+the show page hides both — before this slice that endpoint would happily
+mark an application `Hired` with no offer or `Employee` behind it at
+all. `Offered`/`Hired` are now reachable only through the offer
+lifecycle and `convert()` below.
+
+`JobOfferController::convert()` is the hiring-conversion step CLAUDE.md
+previously listed as "not built yet": it turns an Accepted offer into a
+real `Employee` + `Employment` row (`change_type=Hire`,
+`effective_date` = the offer's `start_date`, `basic_salary` = the
+offer's `offered_salary`), the actual integration point back from
+Recruitment into Phase 6/7's tables. First/last name, email, and mobile
+come from the `Applicant` record, not re-entered — the convert form only
+collects `employee_number` (required, genuinely new) plus the handful of
+optional bio fields `Applicant` never captured (middle name, suffix,
+preferred name, birth date, gender, civil status, nationality), rather
+than reusing `EmployeeController`'s form wholesale. `converted_
+employee_id`/`converted_at` freeze the outcome on the `job_offers` row
+itself (same shape as `CoeRequest`'s snapshot columns) and double as the
+guard against converting the same offer twice.
+
+**`convert()` requires `employees.create` in addition to
+`recruitment.manage`** — creating the actual Employee master record is
+exactly what that permission gates everywhere else in the app, and
+crossing from Recruitment into Core HR data deserves both, not a reused
+single permission. No seeded role currently holds both (Recruitment
+Officer lacks `employees.create`; HR Administrator/HR Staff lack
+`recruitment.manage`), so completing a hire today needs either
+Superadmin or granting one role both permissions through the Roles UI —
+the same "permission exists, nothing's granted it by default yet"
+pattern CLAUDE.md already documents for `organization.manage`, not a bug
+to fix here.
+
+**Not built yet**: Onboarding (templates, tasks, per-hire completion
+tracking) — it depends on hiring conversion existing first, which this
+slice now provides.
 
 ## Commands
 

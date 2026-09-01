@@ -52,7 +52,7 @@
                         @method('PUT')
                         <select name="status" class="form-select form-select-sm" style="width: auto;">
                             @foreach (\App\Enums\ApplicationStatus::cases() as $case)
-                                @continue($case->value === 'rejected')
+                                @continue(in_array($case->value, ['rejected', 'offered', 'hired'], true))
                                 <option value="{{ $case->value }}" {{ $application->status->value === $case->value ? 'selected' : '' }}>
                                     {{ $case->label() }}
                                 </option>
@@ -179,6 +179,77 @@
                     @empty
                         <tr>
                             <td colspan="6" class="text-center text-body-secondary py-3">No assessments assigned yet.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0">Job Offers</h2>
+        @can('recruitment.manage')
+            @unless ($application->status->isTerminal() || $application->hasPendingJobOffer())
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newOfferModal">Extend Offer</button>
+            @endunless
+        @endcan
+    </div>
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-compact mb-0">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Salary</th>
+                        <th>Start Date</th>
+                        <th>Status</th>
+                        <th>Extended By</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($application->jobOffers as $offer)
+                        <tr>
+                            <td>{{ $offer->position?->title ?? '—' }}</td>
+                            <td>{{ number_format($offer->offered_salary, 2) }}</td>
+                            <td>{{ $offer->start_date->format('M d, Y') }}</td>
+                            <td>
+                                @if ($offer->status->value === 'accepted')
+                                    <span class="badge text-bg-success">{{ $offer->status->label() }}</span>
+                                @elseif (in_array($offer->status->value, ['declined', 'rescinded'], true))
+                                    <span class="badge text-bg-danger">{{ $offer->status->label() }}</span>
+                                @else
+                                    <span class="badge text-bg-warning">{{ $offer->status->label() }}</span>
+                                @endif
+                                @if ($offer->converted_at)
+                                    <span class="badge text-bg-info">Converted</span>
+                                @endif
+                            </td>
+                            <td>{{ $offer->extendedBy?->name ?? '—' }}</td>
+                            <td class="text-end">
+                                @can('recruitment.manage')
+                                    @if ($offer->status->value === 'pending')
+                                        <form method="POST" action="{{ route('admin.recruitment.applications.offers.accept', [$application, $offer]) }}" class="d-inline">
+                                            @csrf
+                                            @method('PUT')
+                                            <button type="submit" class="btn btn-sm btn-outline-success">Accept</button>
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#declineOfferModal{{ $offer->id }}">Decline</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rescindOfferModal{{ $offer->id }}">Rescind</button>
+                                    @elseif ($offer->status->value === 'accepted' && ! $offer->converted_at)
+                                        @can('employees.create')
+                                            <a href="{{ route('admin.recruitment.applications.offers.convert-form', [$application, $offer]) }}" class="btn btn-sm btn-primary">Convert to Employee</a>
+                                        @endcan
+                                    @endif
+                                @endcan
+                                @if ($offer->converted_at)
+                                    <a href="{{ route('admin.employees.show', $offer->converted_employee_id) }}" class="btn btn-sm btn-outline-secondary">View Employee</a>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center text-body-secondary py-3">No offers extended yet.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -368,6 +439,132 @@
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+
+        <div class="modal fade" id="newOfferModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('admin.recruitment.applications.offers.store', $application) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title">Extend Offer</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Department</label>
+                                    <select name="department_id" class="form-select">
+                                        <option value="">—</option>
+                                        @foreach ($departments as $department)
+                                            <option value="{{ $department->id }}">{{ $department->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Position</label>
+                                    <select name="position_id" class="form-select">
+                                        <option value="">—</option>
+                                        @foreach ($positions as $position)
+                                            <option value="{{ $position->id }}">{{ $position->title }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Employment Type</label>
+                                    <select name="employment_type" class="form-select" required>
+                                        @foreach (\App\Enums\EmploymentType::cases() as $case)
+                                            <option value="{{ $case->value }}">{{ ucwords(str_replace('_', ' ', $case->value)) }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Work Arrangement</label>
+                                    <select name="work_arrangement" class="form-select">
+                                        <option value="">—</option>
+                                        @foreach (\App\Enums\WorkArrangement::cases() as $case)
+                                            <option value="{{ $case->value }}">{{ ucfirst($case->value) }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Offered Salary</label>
+                                    <input type="number" step="0.01" min="0" name="offered_salary" class="form-control" required>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Start Date</label>
+                                    <input type="date" name="start_date" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Response Deadline</label>
+                                <input type="date" name="expires_at" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Notes</label>
+                                <textarea name="notes" rows="2" class="form-control"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Extend Offer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        @foreach ($application->jobOffers as $offer)
+            @continue($offer->status->value !== 'pending')
+            <div class="modal fade" id="declineOfferModal{{ $offer->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ route('admin.recruitment.applications.offers.decline', [$application, $offer]) }}">
+                            @csrf
+                            @method('PUT')
+                            <div class="modal-header">
+                                <h5 class="modal-title">Decline Offer</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <label class="form-label">Reason</label>
+                                <textarea name="decision_reason" rows="2" class="form-control" required></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger">Decline</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="rescindOfferModal{{ $offer->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ route('admin.recruitment.applications.offers.rescind', [$application, $offer]) }}">
+                            @csrf
+                            @method('PUT')
+                            <div class="modal-header">
+                                <h5 class="modal-title">Rescind Offer</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <label class="form-label">Reason</label>
+                                <textarea name="decision_reason" rows="2" class="form-control" required></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-warning">Rescind</button>
                             </div>
                         </form>
                     </div>
