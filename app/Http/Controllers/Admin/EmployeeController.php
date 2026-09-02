@@ -96,6 +96,7 @@ class EmployeeController extends Controller
             'performanceImprovementPlans' => fn ($q) => $q->with(['performanceReview', 'initiatedBy']),
             'employeeCompetencies' => fn ($q) => $q->with(['competency', 'assessedBy']),
             'employeeSkills' => fn ($q) => $q->with(['skill', 'assessedBy']),
+            'trainingEnrollments' => fn ($q) => $q->with('session.course'),
         ]);
 
         return view('admin.employees.show', [

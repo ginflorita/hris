@@ -78,6 +78,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
+                                <a href="{{ route('admin.training.courses.sessions.show', [$course, $session]) }}" class="btn btn-sm btn-outline-secondary">Roster</a>
                                 @can('training.manage')
                                     @if ($session->status->value === 'scheduled')
                                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editSessionModal{{ $session->id }}">Edit</button>

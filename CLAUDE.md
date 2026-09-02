@@ -230,11 +230,13 @@ non-negotiable — don't relax these for convenience):
   triggering review, `Active → Successful/Unsuccessful/Cancelled`) on
   the Performance tab, **Competencies + Skills** (company-scoped
   catalogs plus per-employee ratings on a new Skills & Competencies tab),
-  and **Training Providers/Courses/Sessions** (a course's catalog data
-  plus its scheduled instances, `Scheduled → Completed/Cancelled`), the
-  last two gated by `training.view`/`training.manage`. See Talent
-  Management below for what's built and what's left (Training
-  Enrollment/Attendance/Certificates, Career development, Succession
+  **Training Providers/Courses/Sessions** (a course's catalog data plus
+  its scheduled instances, `Scheduled → Completed/Cancelled`), and
+  **Training Enrollment/Attendance/Certificates** (one table, a session's
+  roster with a combined outcome+certificate decision and enforced
+  capacity), all gated by `training.view`/`training.manage`. Blueprint
+  §23 (Training and Learning) is now complete end-to-end. See Talent
+  Management below for what's left (Career development, Succession
   planning).
 
 **Not started:** the remainder of Phase 15, then Phase 16 onward through
@@ -1732,10 +1734,74 @@ to include it itself; this one didn't. Fixed by copying the
 already uses verbatim — worth checking for on any future custom show
 page that isn't built on `<x-admin.resource-index>`.
 
-**Not built yet**: Training Enrollment, Attendance, and Certificates
-(the rest of blueprint §23 — a training session's roster, who showed
-up, and what they earned for completing it), Career development,
-Succession planning.
+**15f — Training Enrollment, Attendance, and Certificates, closing out
+blueprint §23.** Three more listed functions, one table
+(`training_enrollments`). "Attendance" is folded into a `status` enum
+(`Enrolled → Completed/Cancelled/NoShow` — `Completed` *is* "attended"),
+the same way `Interview`'s outcome columns live directly on the
+interview row rather than a separate evaluation table. "Certificates"
+is three nullable columns (`certificate_number`/`_issued_at`/
+`_expires_at`) on the same row, not a wrapper table — one enrollment has
+at most one certificate, not a repeating collection. `update()` records
+the outcome and the certificate together in one action, the same
+one-combined-edit preference `Assessment`'s `completed_at`/`score`/
+`passed`/`notes` update already established, guarded to fire only once
+from `Enrolled` (the same "a decision can't be re-applied by
+resubmitting" rule `AttendanceCorrectionRequest`/`CoeRequest` use) —
+certificate fields are silently discarded server-side unless the
+decision is `Completed`, so a `NoShow` can't accidentally carry one.
+
+**Capacity is enforced, not just displayed** — `TrainingSession
+::occupiedSeats()` counts `Enrolled` + `Completed` rows (a `Cancelled`/
+`NoShow` frees the seat it held) and `store()` rejects a new enrollment
+once that count reaches `capacity`. The field existed since 15e
+specifically for this; leaving it unenforced would have made it
+decorative. Enrollment also re-validates `Rule::unique('training_enrollments')`
+against `(employee_id, training_session_id)`, turning what the table's
+own unique index would otherwise reject as a raw `QueryException` into
+a friendly form error.
+
+**`TrainingSessionController::show()` is new this slice** — once a
+session has a roster to manage, it earns its own page rather than
+staying purely modal-driven off the course's show page, the same
+"enough of its own related data to deserve a page" call 14c made moving
+Interview/Assessment onto `Admin\ApplicationController::show()`. The
+course page's session table gained a plain "Roster" link per row;
+nothing about 15e's existing Edit/Complete/Cancel actions changed. A
+new read-only **Training** tab on the employee profile page
+cross-references the same enrollments from the employee's side — no
+edit actions there, since decisions are made from the session's roster,
+not duplicated onto a second surface.
+
+**Bug caught by browser verification: none this slice.** Every check
+(capacity blocking, the friendly duplicate-enrollment error, certificate
+fields surviving a Completed decision and being dropped on any other,
+locked action buttons once decided, the employee-side Training tab
+reflecting the same data) passed on the first Playwright run — likely
+because this slice's two new pages (`sessions/show.blade.php`, the
+employee `_training.blade.php` tab) were both written with the
+`@session('status')`/`$errors->any()` alert block already in place from
+the start, after 15e's session-show-page omission of exactly that block
+was caught and fixed.
+
+**Expiration reminders is a documented, deliberate gap** — the
+same treatment Leave's accrual scheduler and Payroll's OT/holiday pay
+already get. `certificate_expires_at` exists and is populated; nothing
+runs on a schedule to check it and notify anyone. Don't fake a reminder
+in the UI; a real implementation needs a scheduled job, which is a
+natural candidate whenever this app grows a job-scheduling story for
+the first time (there isn't one yet — no other module has needed
+`php artisan schedule:run` before now either).
+
+Blueprint §23 (Training and Learning: catalog, providers, courses,
+sessions, enrollment, attendance, cost, certificates, skills,
+competencies, expiration reminders) is now complete end-to-end across
+15d-15f.
+
+**Not built yet**: Career development, Succession planning (the last
+two Phase 15 functions — blueprint's table of contents names them but,
+like Skills & Competencies before 15d, the body text has no dedicated
+section for either beyond the bare phase-list bullet).
 
 ## Commands
 

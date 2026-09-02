@@ -189,6 +189,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeSkill::class);
     }
 
+    public function trainingEnrollments(): HasMany
+    {
+        return $this->hasMany(TrainingEnrollment::class)->orderByDesc('enrolled_at');
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\TrainingEnrollmentStatus;
 use App\Enums\TrainingSessionStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingSession extends Model
 {
@@ -31,5 +33,21 @@ class TrainingSession extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(TrainingCourse::class, 'training_course_id');
+    }
+
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(TrainingEnrollment::class);
+    }
+
+    /**
+     * Enrolled + Completed count against capacity -- Cancelled/NoShow
+     * free up the slot they held.
+     */
+    public function occupiedSeats(): int
+    {
+        return $this->enrollments()
+            ->whereIn('status', [TrainingEnrollmentStatus::Enrolled, TrainingEnrollmentStatus::Completed])
+            ->count();
     }
 }
