@@ -222,12 +222,13 @@ non-negotiable — don't relax these for convenience):
   decisions.
 
 - Phase 15 (partial) — Talent Management: **Performance Cycles**
-  (`Draft → Active → Closed`) and **Performance Goals** (per-employee,
-  nullable measurable target instead of a separate KPIs table), on a new
-  Performance tab on the employee profile page. See Talent Management
-  below for what's built and what's left (Competencies, Skills,
-  Performance Reviews, Training, Career development, Succession
-  planning).
+  (`Draft → Active → Closed`), **Performance Goals** (per-employee,
+  nullable measurable target instead of a separate KPIs table), and
+  **Performance Reviews** (self/manager/peer, one table by `type`, rating
+  + comments, `Draft → Submitted → Acknowledged`), all on the Performance
+  tab on the employee profile page. See Talent Management below for
+  what's built and what's left (Competencies, Skills, PIP, Training,
+  Career development, Succession planning).
 
 **Not started:** the remainder of Phase 15, then Phase 16 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1531,11 +1532,62 @@ it's genuinely discrete, unlike `Assessment`'s pending/passed/failed
 which needed a third state for a different reason) is edited alongside
 the goal's own fields in the same edit modal, not a separate action.
 
-**Not built yet**: Competencies, Skills, Performance Reviews/Ratings/
-Comments (self/manager/peer review submission — blueprint §22's other
-half of Performance Management), Training (catalog, sessions,
-enrollment, attendance, certificates — blueprint §23), Career
-development, Succession planning.
+**15b — Performance Reviews.** Self-review, manager review, and peer
+review (blueprint §22) are one table/controller differentiated by a
+`type` enum (`App\Enums\PerformanceReviewType`), not three near-identical
+ones — the same "one flexible table" call `CompensationItem` and 15a's
+Goals/KPIs collapse already made. "Ratings" and "Comments" are likewise
+just `rating` (1-5, matching `Interview`'s existing rating scale) and
+`comments` columns on the same row, not their own tables. "Performance
+history" isn't a table either — it's every review/goal row for an
+employee across cycles, queried on the existing profile tab, not
+duplicated anywhere. `PerformanceReview` is managed from the same
+Performance tab as Goals (`EmployeePerformanceReviewController`, routes
+under `admin.employees.performance-reviews.*`), gated by
+`performance.manage` like Goals.
+
+Status moves only `Draft` → `Submitted` → `Acknowledged` via
+`submit()`/`acknowledge()` guarded actions, the same lifecycle shape
+`PerformanceCycle`'s `activate()`/`close()` established — `update()`/
+`destroy()` are only allowed while `Draft`, so a review already shown to
+(or acknowledged by) the employee can't silently change after the fact,
+the same "don't overwrite an issued record" principle the COE snapshot
+uses, applied here without needing an actual snapshot since the review
+row itself is what's being protected. `submit()` additionally requires
+`rating` to already be set — an unrated review can't be submitted.
+
+`reviewer_id` always points at an `Employee` row (for a self-review it
+equals `employee_id`); a self-review must name the employee as their own
+reviewer and a manager/peer review must not, both checked in the
+controller rather than a validation rule, the same "needs the route's
+`$employee` for comparison" reasoning `Employment.manager_id`'s
+self-check already uses. **At most one Self and one Manager review per
+employee per cycle; Peer reviews are unrestricted** (several peers can
+weigh in) — an app-level closure validation rule, not a DB unique index
+since it only applies to two of the three types, the same shape
+`PayrollPeriod`'s overlap check and `Application::hasPendingJobOffer()`
+already use for constraints a DB constraint can't express.
+
+Acknowledgement is admin-side only in this slice — there's no portal
+self-service action for an employee to acknowledge their own review yet
+(unlike blueprint §18's self-service bullets Phase 13 already built for
+Leave/Overtime/Attendance/COE). Extending Employee Self-Service to cover
+this is a candidate for a later slice, not silently out of scope.
+
+**Bug caught by browser verification, fixed before shipping:** none in
+the application — the one issue Playwright surfaced was in the
+verification script itself (re-clicking a Bootstrap tab immediately
+after `page.goto()`, before its JS had attached, left the tab visually on
+Overview for one screenshot) rather than the app; every functional
+check (validation rejecting a duplicate manager review, lifecycle
+guards blocking edit/delete once submitted, status badges updating
+correctly) passed against the real rendered HTML on the first run once
+the seed data carried the `employees.view` permission the show page
+itself needs.
+
+**Not built yet**: Competencies, Skills, Performance Improvement Plan
+(PIP), Training (catalog, sessions, enrollment, attendance, certificates
+— blueprint §23), Career development, Succession planning.
 
 ## Commands
 

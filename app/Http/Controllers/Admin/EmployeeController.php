@@ -90,6 +90,7 @@ class EmployeeController extends Controller
             'compensationItems' => fn ($q) => $q->orderByDesc('effective_date'),
             'onboardings' => fn ($q) => $q->with(['template', 'assignedBy', 'tasks.completedBy']),
             'performanceGoals' => fn ($q) => $q->with('performanceCycle'),
+            'performanceReviews' => fn ($q) => $q->with(['performanceCycle', 'reviewer']),
         ]);
 
         return view('admin.employees.show', [
@@ -105,6 +106,7 @@ class EmployeeController extends Controller
             'payrollGroups' => PayrollGroup::where('company_id', $employee->company_id)->orderBy('name')->get(),
             'onboardingTemplates' => OnboardingTemplate::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
             'performanceCycles' => PerformanceCycle::where('company_id', $employee->company_id)->orderByDesc('start_date')->get(),
+            'companyEmployees' => Employee::where('company_id', $employee->company_id)->orderBy('last_name')->get(),
         ]);
     }
 
