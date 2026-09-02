@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\EmployeeSkillController;
 use App\Http\Controllers\Admin\EmployeeSuccessionCandidateController;
 use App\Http\Controllers\Admin\EmploymentController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
+use App\Http\Controllers\Admin\OffboardingRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
@@ -105,5 +106,9 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::delete('succession-candidacies/{candidate}', [EmployeeSuccessionCandidateController::class, 'destroy'])->name('succession-candidacies.destroy');
 
             Route::post('benefit-enrollments', [EmployeeBenefitEnrollmentController::class, 'store'])->name('benefit-enrollments.store');
+
+            Route::post('offboarding-requests', [OffboardingRequestController::class, 'store'])->name('offboarding-requests.store');
+            Route::put('offboarding-requests/{offboarding}/advance', [OffboardingRequestController::class, 'advance'])->name('offboarding-requests.advance');
+            Route::put('offboarding-requests/{offboarding}/cancel', [OffboardingRequestController::class, 'cancel'])->name('offboarding-requests.cancel');
         });
     });

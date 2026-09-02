@@ -241,18 +241,25 @@ non-negotiable — don't relax these for convenience):
   `performance.manage`. See Talent Management below for the full set of
   decisions, including two functions (Career development, Succession
   planning) blueprint names but never actually specifies.
-- Phase 16 (partial) — Benefits & Offboarding: **Benefits** (`BenefitPlan`
+- Phase 16 (complete) — Benefits & Offboarding: **Benefits** (`BenefitPlan`
   catalog limited to the four types not already covered elsewhere --
   HMO/Insurance/Loan/Retirement -- plus effective-dated, append-only
   `BenefitEnrollment` reusing the existing `EmployeeDependent` table for
-  coverage), gated by `benefits.view`/`benefits.manage`. See Benefits
-  below. Offboarding (§26) is next.
+  coverage), gated by `benefits.view`/`benefits.manage`; and
+  **Offboarding** (`OffboardingRequest`, one row per resignation, driven
+  through blueprint §26's fixed 10-step pipeline by a single generic
+  `advance()` action rather than ten guarded methods, plus a Cancel
+  off-ramp), gated by `employees.view`/`employees.update`, with the one
+  real integration point (Account Disabled → `users.disabled_at`) wired
+  and the rest (final payroll, COE, separation) left as documented,
+  deliberate gaps. See Benefits and Offboarding below.
 
-**Not started:** the remainder of Phase 16 (Offboarding), then Phase 17
-onward through Phase 18. Follow the phase order in blueprint §54/§59;
-don't jump ahead to a later phase's tables/UI before its dependencies
-exist. Re-read the relevant blueprint section before starting a phase —
-this file is a summary, not a substitute.
+**Not started:** Phase 17 (Security Hardening & OWASP Verification)
+onward through Phase 18 (Production, Backup & Disaster Recovery). Follow
+the phase order in blueprint §54/§59; don't jump ahead to a later
+phase's tables/UI before its dependencies exist. Re-read the relevant
+blueprint section before starting a phase — this file is a summary, not
+a substitute.
 
 ## Authentication
 
@@ -1922,6 +1929,125 @@ already has, for the same reason.
 the new one's effective date, a second concurrent plan being unaffected,
 covered-dependent validation and display) passed on the first Playwright
 run.
+
+## Offboarding (Phase 16b, closes Phase 16)
+
+Blueprint §26 is a literal ASCII flowchart, not a table/field list like
+most other sections: `Resignation → Approval → Notice Period →
+Clearance → Asset Return → Final Payroll → Final Pay → COE → Account
+Disable → Separated`, with an explicit standalone note, "Never delete
+the employee record." One table, `OffboardingRequest`, one row per
+resignation.
+
+**`App\Enums\OffboardingStatus` drives the whole pipeline through
+`sequence()`/`next()` and a single generic `advance()` controller
+action, not ten separate guarded methods.** This is a deliberate
+departure from `PayrollPeriod`'s Phase 12a precedent (one dedicated
+guarded action per transition — `submitForApproval()`, `approve()`,
+`finalize()`, `lock()`, `publish()`), because the two state machines
+have different shapes: Payroll's has a real branch (`reject()` sends
+`ForApproval` back to `ForReview`, not forward), so each transition
+needs its own validation and audit columns. Offboarding's blueprint
+diagram is strictly linear with no branch at all except an app-level-
+added Cancel off-ramp — ten identical `abort_unless($status ===
+X)->update(['status' => Y])` methods would be pure repetition of the
+same logic ten times. `sequence()` returns the ten non-Cancelled cases
+in pipeline order; `next()` looks up the current case and returns
+whichever follows (or `null` at `Separated`); `advance()` just resolves
+`next()`, aborts if there isn't one or the request is already terminal,
+and updates `status` + `status_changed_at` (plus `approved_at`/
+`approved_by` at the `Approved` step specifically, the one step with
+its own audit columns). `isTerminal()` is `Separated || Cancelled`.
+
+**The one wired integration: reaching `AccountDisabled` disables the
+employee's linked `User` account**, reusing Phase 3's existing
+`users.disabled_at` column and disable mechanism verbatim
+(`$employee->user?->update(['disabled_at' => now()])`) — an employee
+with no linked account (most employees; `users.employee_id` is optional,
+Phase 12c) simply has nothing to disable, which is correct, not an
+error. Every other pipeline step is deliberately left as a documented
+gap rather than a fake integration:
+- **Final Payroll / Final Pay** don't create or touch any `PayrollPeriod`/
+  `PayrollItem` — computing a final pay run (prorated last-period salary,
+  unused leave conversion, government-mandated final pay components) is
+  real, jurisdiction-specific payroll policy, not a mechanical status
+  flip, the same restraint CLAUDE.md's Payroll section already documents
+  for overtime/holiday pay peso amounts.
+- **COE** doesn't auto-create a `CoeRequest` (Phase 13d already has a
+  full request→approve→snapshot→PDF flow of its own) — advancing past
+  this step records that a COE was handled, but HR still submits the
+  actual request through the existing Employee Self-Service flow if the
+  separating employee needs the document.
+- **Separated** doesn't create an `Employment` row with `change_type`
+  reflecting separation, or set an end date on the current one —
+  `Employment`'s own separation `change_type` exists in
+  `EmploymentChangeType` but nothing calls it from here. Wiring that in
+  would mean either guessing an `effective_date` this table doesn't
+  collect or adding a new field just for this integration; better to
+  leave "record the actual separation" as an explicit follow-up HR
+  action through the existing Employment tab (Phase 7) than to guess.
+
+**Never deletes the `Employee` record**, per blueprint §26's own
+explicit note and CLAUDE.md's own non-negotiable rule — there is no
+`destroy()` on `OffboardingRequestController` at all, matching
+`EmploymentController`'s append-only shape rather than
+`Admin\AttendanceController`'s corrected-in-place shape (there's nothing
+here that needs correcting after the fact the way a mistyped attendance
+time does).
+
+**At most one non-terminal request per employee at a time**, checked
+with the same `whereNotIn('status', ['separated', 'cancelled'])->exists()`
+shape `hasPendingJobOffer()`/onboarding's "at most one incomplete
+checklist" checks already use — a fresh request can always be started
+again after a prior one was `Cancelled` (an employee withdrawing their
+resignation and later resigning again is a normal scenario, not an
+error state).
+
+**`cancel()` requires a reason** (`cancellation_reason`, same required-
+string pattern as `LeaveRequestController::reject()`/`PayrollPeriodController
+::reject()`) and works from any non-terminal status, not just early
+ones — an offboarding can be called off at Clearance or Asset Return
+just as validly as at Resignation, so there's no restriction on *which*
+non-terminal status Cancel is available from beyond "not already
+terminal."
+
+Gated by `employees.view` (index, same as COE Requests' flat list) and
+`employees.update` (store/advance/cancel, same as every other per-
+employee mutating sub-resource) — no dedicated `offboarding.*`
+permission group exists in the seeded catalog, and this is fundamentally
+an employment-lifecycle action on an existing `Employee`, the same shape
+`employees.update` already gates for Employment/Compensation/Onboarding,
+so it reuses rather than invents, the same move Compensation (Phase 10)
+made first.
+
+Managed from a new **Offboarding** tab on the employee profile page
+(`admin.employees.show`) — a "Start Offboarding" button/modal when no
+request is active, a status card with "Advance to {next step}" and
+"Cancel" actions when one is, and a read-only History table below of
+every request the employee has had. Also gets a genuine new **WORKFORCE
+> Offboarding** sidebar entry pointing at the flat
+`admin.offboarding-requests.index` list (all in-progress and completed
+requests across every employee, for HR to triage from one place) — a
+real, deliberate addition, unlike Career/Succession (Phase 15g), which
+got no sidebar entry of their own since they're purely per-employee
+detail with no company-wide list HR needs to scan.
+
+**Bug caught by browser verification: none in the application** — both
+issues found during this slice's Playwright pass were in the
+verification script, not the app itself. First, the standard tab-
+reselection issue this codebase has hit before (a Bootstrap tab resets
+to its default after any full-page redirect; the advance-loop needed to
+re-click the Offboarding tab on every iteration, not just once at the
+top). Second, a new variant of the same class: Laravel's one-time flash
+`session('status')` was being consumed by the tab-reselection helper's
+own extra `page.goto()` navigation *before* the script ever checked
+`.alert-success`, since that check ran after an additional re-navigation
+past the redirect that already carried the flash. Fixed by checking the
+success message immediately after the redirect's own page load, before
+any further navigation. Ground-truthed against the real sequence after
+both fixes: all ten steps advanced correctly end-to-end, `approved_at`/
+`approved_by` were stamped at `Approved`, and the linked `User` account's
+`disabled_at` was confirmed non-null via `tinker` after `AccountDisabled`.
 
 ## Commands
 

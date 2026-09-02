@@ -101,6 +101,7 @@ class EmployeeController extends Controller
             'careerDevelopmentPlans' => fn ($q) => $q->with('targetPosition'),
             'successionCandidacies' => fn ($q) => $q->with('position'),
             'benefitEnrollments' => fn ($q) => $q->with(['plan', 'coveredDependents']),
+            'offboardingRequests' => fn ($q) => $q->with(['approvedBy', 'createdBy']),
         ]);
 
         return view('admin.employees.show', [

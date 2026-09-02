@@ -209,6 +209,11 @@ class Employee extends Model
         return $this->hasMany(BenefitEnrollment::class)->orderByDesc('effective_date');
     }
 
+    public function offboardingRequests(): HasMany
+    {
+        return $this->hasMany(OffboardingRequest::class)->orderByDesc('created_at');
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

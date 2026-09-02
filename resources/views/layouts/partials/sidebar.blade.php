@@ -1,10 +1,10 @@
 {{--
     Mostly still static placeholders — most modules aren't built yet (see
     CLAUDE.md "Status"). WORKFORCE > Employees/Organization/Positions/COE
-    Requests, TIME & ATTENDANCE > Attendance/Schedules/Shifts/Overtime/
-    Holidays/Leave, PAYROLL > Compensation/Benefits, TALENT >
-    Recruitment/Applicants/Onboarding/Performance/Training/Skills, and
-    ADMINISTRATION > Users/Roles/Permissions are real and
+    Requests/Offboarding, TIME & ATTENDANCE > Attendance/Schedules/
+    Shifts/Overtime/Holidays/Leave, PAYROLL > Compensation/Benefits,
+    TALENT > Recruitment/Applicants/Onboarding/Performance/Training/
+    Skills, and ADMINISTRATION > Users/Roles/Permissions are real and
     permission-gated; the rest light up the same way as their phase
     lands.
 --}}
@@ -39,6 +39,7 @@
                 'Employment' => null,
                 'Documents' => null,
                 'COE Requests' => ['route' => 'admin.coe-requests.index', 'can' => ['employees.view']],
+                'Offboarding' => ['route' => 'admin.offboarding-requests.index', 'can' => ['employees.view']],
             ],
             'TIME & ATTENDANCE' => [
                 'Attendance' => ['route' => 'admin.attendance.attendances.index', 'can' => ['attendance.view']],
