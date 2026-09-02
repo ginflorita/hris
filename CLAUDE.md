@@ -223,12 +223,14 @@ non-negotiable — don't relax these for convenience):
 
 - Phase 15 (partial) — Talent Management: **Performance Cycles**
   (`Draft → Active → Closed`), **Performance Goals** (per-employee,
-  nullable measurable target instead of a separate KPIs table), and
+  nullable measurable target instead of a separate KPIs table),
   **Performance Reviews** (self/manager/peer, one table by `type`, rating
-  + comments, `Draft → Submitted → Acknowledged`), all on the Performance
-  tab on the employee profile page. See Talent Management below for
-  what's built and what's left (Competencies, Skills, PIP, Training,
-  Career development, Succession planning).
+  + comments, `Draft → Submitted → Acknowledged`), and **Performance
+  Improvement Plans** (reason/goals/period, optionally linked to a
+  triggering review, `Active → Successful/Unsuccessful/Cancelled`), all
+  on the Performance tab on the employee profile page. See Talent
+  Management below for what's built and what's left (Competencies,
+  Skills, Training, Career development, Succession planning).
 
 **Not started:** the remainder of Phase 15, then Phase 16 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1585,9 +1587,44 @@ correctly) passed against the real rendered HTML on the first run once
 the seed data carried the `employees.view` permission the show page
 itself needs.
 
-**Not built yet**: Competencies, Skills, Performance Improvement Plan
-(PIP), Training (catalog, sessions, enrollment, attendance, certificates
-— blueprint §23), Career development, Succession planning.
+**15c — Performance Improvement Plans, closing out blueprint §22.** A PIP
+is forward-looking (reason, improvement goals, a bounded start/end
+period, a closing outcome) rather than backward-looking like a review,
+so it's a genuinely separate table (`performance_improvement_plans`),
+not a `PerformanceReview` subtype — the collapsing judgment call this
+codebase makes everywhere else only applies when two things are the
+*same shape*; a PIP and a review aren't. `performance_review_id` is
+nullable: a PIP commonly follows a poor review but doesn't have to (it
+can also follow a standalone conduct/performance incident), and when set
+it's validated against `performance_reviews.employee_id` matching the
+route's `$employee` — tighter than the usual company-scope check, since
+a review is inherently employee-specific, not just company-specific.
+Managed from the same Performance tab as Goals/Reviews
+(`EmployeePerformanceImprovementPlanController`, routes under
+`admin.employees.performance-improvement-plans.*`), gated by
+`performance.manage`.
+
+Lifecycle is `Active` until `close()` moves it to one of three terminal
+outcomes — `Successful`/`Unsuccessful`/`Cancelled` (`Rule::in`, not a
+bare enum rule, since `Active` itself is never a valid *closing* value)
+— stamping `closed_at`/`closed_by`. `update()`/`destroy()` are only
+allowed while `Active`, the same "an issued record doesn't silently
+change" guard `PerformanceReview`'s Draft-only edit uses, applied here
+to the whole record rather than just pre-submission — once closed, a
+PIP is a permanent part of the employee's history, favorable or not,
+exactly the kind of record CLAUDE.md's general non-overwrite principle
+protects even outside payroll/employment.
+
+**Bug caught by browser verification, fixed before shipping:** none in
+the application — ground-truthed against the database directly (both
+plans existed with the right `performance_review_id`/`status` values)
+after a verification-script check came back a false negative from the
+same class of timing issue as 15b's (checking page content immediately
+after a redirect, before navigating back to the Performance tab).
+
+**Not built yet**: Competencies, Skills, Training (catalog, sessions,
+enrollment, attendance, certificates — blueprint §23), Career
+development, Succession planning.
 
 ## Commands
 

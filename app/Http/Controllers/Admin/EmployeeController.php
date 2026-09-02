@@ -91,6 +91,7 @@ class EmployeeController extends Controller
             'onboardings' => fn ($q) => $q->with(['template', 'assignedBy', 'tasks.completedBy']),
             'performanceGoals' => fn ($q) => $q->with('performanceCycle'),
             'performanceReviews' => fn ($q) => $q->with(['performanceCycle', 'reviewer']),
+            'performanceImprovementPlans' => fn ($q) => $q->with(['performanceReview', 'initiatedBy']),
         ]);
 
         return view('admin.employees.show', [

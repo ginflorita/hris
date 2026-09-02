@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\EmployeeNoteController;
 use App\Http\Controllers\Admin\EmployeeOnboardingController;
 use App\Http\Controllers\Admin\EmployeeOnboardingTaskController;
 use App\Http\Controllers\Admin\EmployeePerformanceGoalController;
+use App\Http\Controllers\Admin\EmployeePerformanceImprovementPlanController;
 use App\Http\Controllers\Admin\EmployeePerformanceReviewController;
 use App\Http\Controllers\Admin\EmployeeScheduleController;
 use App\Http\Controllers\Admin\EmploymentController;
@@ -74,5 +75,10 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::put('performance-reviews/{review}/submit', [EmployeePerformanceReviewController::class, 'submit'])->name('performance-reviews.submit');
             Route::put('performance-reviews/{review}/acknowledge', [EmployeePerformanceReviewController::class, 'acknowledge'])->name('performance-reviews.acknowledge');
             Route::delete('performance-reviews/{review}', [EmployeePerformanceReviewController::class, 'destroy'])->name('performance-reviews.destroy');
+
+            Route::post('performance-improvement-plans', [EmployeePerformanceImprovementPlanController::class, 'store'])->name('performance-improvement-plans.store');
+            Route::put('performance-improvement-plans/{plan}', [EmployeePerformanceImprovementPlanController::class, 'update'])->name('performance-improvement-plans.update');
+            Route::put('performance-improvement-plans/{plan}/close', [EmployeePerformanceImprovementPlanController::class, 'close'])->name('performance-improvement-plans.close');
+            Route::delete('performance-improvement-plans/{plan}', [EmployeePerformanceImprovementPlanController::class, 'destroy'])->name('performance-improvement-plans.destroy');
         });
     });

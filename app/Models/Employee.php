@@ -174,6 +174,11 @@ class Employee extends Model
         return $this->hasMany(PerformanceReview::class)->orderByDesc('created_at');
     }
 
+    public function performanceImprovementPlans(): HasMany
+    {
+        return $this->hasMany(PerformanceImprovementPlan::class)->orderByDesc('start_date');
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);
