@@ -194,6 +194,16 @@ class Employee extends Model
         return $this->hasMany(TrainingEnrollment::class)->orderByDesc('enrolled_at');
     }
 
+    public function careerDevelopmentPlans(): HasMany
+    {
+        return $this->hasMany(CareerDevelopmentPlan::class)->orderByDesc('created_at');
+    }
+
+    public function successionCandidacies(): HasMany
+    {
+        return $this->hasMany(SuccessionCandidate::class)->orderByDesc('created_at');
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

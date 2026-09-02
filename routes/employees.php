@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CompensationItemController;
 use App\Http\Controllers\Admin\EmployeeAddressController;
+use App\Http\Controllers\Admin\EmployeeCareerDevelopmentPlanController;
 use App\Http\Controllers\Admin\EmployeeCompetencyController;
 use App\Http\Controllers\Admin\EmployeeContactController;
 use App\Http\Controllers\Admin\EmployeeController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Admin\EmployeePerformanceImprovementPlanController;
 use App\Http\Controllers\Admin\EmployeePerformanceReviewController;
 use App\Http\Controllers\Admin\EmployeeScheduleController;
 use App\Http\Controllers\Admin\EmployeeSkillController;
+use App\Http\Controllers\Admin\EmployeeSuccessionCandidateController;
 use App\Http\Controllers\Admin\EmploymentController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
 use Illuminate\Support\Facades\Route;
@@ -90,5 +92,15 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::post('skills', [EmployeeSkillController::class, 'store'])->name('skills.store');
             Route::put('skills/{employeeSkill}', [EmployeeSkillController::class, 'update'])->name('skills.update');
             Route::delete('skills/{employeeSkill}', [EmployeeSkillController::class, 'destroy'])->name('skills.destroy');
+
+            Route::post('career-development-plans', [EmployeeCareerDevelopmentPlanController::class, 'store'])->name('career-development-plans.store');
+            Route::put('career-development-plans/{plan}', [EmployeeCareerDevelopmentPlanController::class, 'update'])->name('career-development-plans.update');
+            Route::put('career-development-plans/{plan}/achieve', [EmployeeCareerDevelopmentPlanController::class, 'achieve'])->name('career-development-plans.achieve');
+            Route::put('career-development-plans/{plan}/cancel', [EmployeeCareerDevelopmentPlanController::class, 'cancel'])->name('career-development-plans.cancel');
+            Route::delete('career-development-plans/{plan}', [EmployeeCareerDevelopmentPlanController::class, 'destroy'])->name('career-development-plans.destroy');
+
+            Route::post('succession-candidacies', [EmployeeSuccessionCandidateController::class, 'store'])->name('succession-candidacies.store');
+            Route::put('succession-candidacies/{candidate}', [EmployeeSuccessionCandidateController::class, 'update'])->name('succession-candidacies.update');
+            Route::delete('succession-candidacies/{candidate}', [EmployeeSuccessionCandidateController::class, 'destroy'])->name('succession-candidacies.destroy');
         });
     });

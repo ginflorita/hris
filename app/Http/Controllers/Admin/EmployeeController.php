@@ -97,6 +97,8 @@ class EmployeeController extends Controller
             'employeeCompetencies' => fn ($q) => $q->with(['competency', 'assessedBy']),
             'employeeSkills' => fn ($q) => $q->with(['skill', 'assessedBy']),
             'trainingEnrollments' => fn ($q) => $q->with('session.course'),
+            'careerDevelopmentPlans' => fn ($q) => $q->with('targetPosition'),
+            'successionCandidacies' => fn ($q) => $q->with('position'),
         ]);
 
         return view('admin.employees.show', [

@@ -221,25 +221,28 @@ non-negotiable — don't relax these for convenience):
   employee profile page). See Recruitment below for the full set of
   decisions.
 
-- Phase 15 (partial) — Talent Management: **Performance Cycles**
+- Phase 15 — Talent Management (complete): **Performance Cycles**
   (`Draft → Active → Closed`), **Performance Goals** (per-employee,
   nullable measurable target instead of a separate KPIs table),
   **Performance Reviews** (self/manager/peer, one table by `type`, rating
   + comments, `Draft → Submitted → Acknowledged`), and **Performance
   Improvement Plans** (reason/goals/period, optionally linked to a
   triggering review, `Active → Successful/Unsuccessful/Cancelled`) on
-  the Performance tab, **Competencies + Skills** (company-scoped
-  catalogs plus per-employee ratings on a new Skills & Competencies tab),
+  the Performance tab; **Competencies + Skills** (company-scoped
+  catalogs plus per-employee ratings on a Skills & Competencies tab);
   **Training Providers/Courses/Sessions** (a course's catalog data plus
-  its scheduled instances, `Scheduled → Completed/Cancelled`), and
+  its scheduled instances, `Scheduled → Completed/Cancelled`) and
   **Training Enrollment/Attendance/Certificates** (one table, a session's
   roster with a combined outcome+certificate decision and enforced
-  capacity), all gated by `training.view`/`training.manage`. Blueprint
-  §23 (Training and Learning) is now complete end-to-end. See Talent
-  Management below for what's left (Career development, Succession
-  planning).
+  capacity), gated by `training.view`/`training.manage`; and **Career
+  Development Plans + Succession Candidacies** (`Active →
+  Achieved/Cancelled` plans plus position-readiness candidacies) on a
+  Career & Succession tab, both reusing `performance.view`/
+  `performance.manage`. See Talent Management below for the full set of
+  decisions, including two functions (Career development, Succession
+  planning) blueprint names but never actually specifies.
 
-**Not started:** the remainder of Phase 15, then Phase 16 onward through
+**Not started:** Phase 16 (Benefits & Offboarding) onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
 to a later phase's tables/UI before its dependencies exist. Re-read the
 relevant blueprint section before starting a phase — this file is a
@@ -1504,7 +1507,7 @@ Onboarding tasks) is now complete end-to-end. Offboarding (blueprint
 §26) is a separate, later module — Phase 16's job, not this one's — see
 Status above before starting Phase 15.
 
-## Talent Management (Phase 15, in progress)
+## Talent Management (Phase 15, complete)
 
 Blueprint §54 lists Phase 15 as Performance, Goals, KPIs, Competencies,
 Skills, Training, Career development, Succession planning — built as
@@ -1798,10 +1801,57 @@ sessions, enrollment, attendance, cost, certificates, skills,
 competencies, expiration reminders) is now complete end-to-end across
 15d-15f.
 
-**Not built yet**: Career development, Succession planning (the last
-two Phase 15 functions — blueprint's table of contents names them but,
-like Skills & Competencies before 15d, the body text has no dedicated
-section for either beyond the bare phase-list bullet).
+**15g — Career Development + Succession Planning, closing out Phase
+15.** The last two functions in blueprint §54's Phase 15 list have zero
+detail anywhere in the document — no functions list the way §22/§23
+have, and the table of contents entries that would name their sections
+(37 "Skills & Competencies", 38 "Career Development", 39 "Succession
+Planning") point at section numbers the body actually gives to Payroll
+Snapshot and Government Rules; those sections were apparently never
+written. Confirmed by grepping for both headings before writing this
+slice, the same check 12c's `users.employee_id` section already
+documents doing for its own migration.
+
+Given no spec to follow, both are modeled as new per-employee tables on
+a **Career & Succession** employee-profile tab, matching every other
+Phase 15 entity's shape rather than inventing a new surface:
+- `CareerDevelopmentPlan` (`target_position_id` nullable, `target_date`,
+  `development_actions`, `Active → Achieved/Cancelled`) reuses PIP's
+  exact lifecycle-guard shape — a career plan is the same kind of
+  forward-looking record with a bounded outcome a PIP is, just aimed at
+  growth instead of correction.
+- `SuccessionCandidate` (`position_id`, `readiness` enum, `notes`,
+  unique per employee+position) has no lifecycle at all — a candidacy is
+  edited in place or removed, not moved through a terminal state.
+  Real-world succession planning is usually organized by *position*
+  ("who could replace the VP of Engineering"), but this table is
+  entered from the *employee* side to avoid adding a `show()` page to
+  `Position` (Phase 5, already shipped, not designed to need one) —
+  same data, just queried from the other direction if a position-centric
+  view is ever needed.
+
+Both reuse `performance.view`/`performance.manage` — Talent
+Management's existing group, since neither function has one of its own
+in the seeded catalog and nothing about either suggests a dedicated
+group is warranted.
+
+**Bug caught by browser verification, fixed before shipping:** none in
+application logic — `SuccessionReadiness`'s generic `ucfirst(str_replace
+('_', ' ', $value))` rendering rendered the two year-range cases as
+"Ready 1 2 years" instead of anything readable. Not a functional defect
+(the stored value and every validation/uniqueness rule around it were
+correct), but real user-facing text a real HR admin would see, so it
+was worth a proper fix: a `label()` method on the enum with an explicit
+`match`, the same "enum owns its own display string" idiom worth
+reaching for whenever a case's raw value doesn't read cleanly through a
+generic transform.
+
+Blueprint §54's Phase 15 (Talent Management: Performance, Goals, KPIs,
+Competencies, Skills, Training, Career development, Succession
+planning) is now complete end-to-end across 15a-15g. Phase 16
+(Benefits & Offboarding) is next — re-read blueprint §54 and whichever
+of §24 (Benefits)/§26 (Offboarding) sections exist before starting it,
+the same discipline every prior phase transition in this file follows.
 
 ## Commands
 
