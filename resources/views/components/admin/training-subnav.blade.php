@@ -2,6 +2,8 @@
 
 @php
     $items = [
+        'courses' => 'Courses',
+        'providers' => 'Providers',
         'competencies' => 'Competencies',
         'skills' => 'Skills',
     ];

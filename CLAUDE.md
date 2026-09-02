@@ -228,11 +228,14 @@ non-negotiable — don't relax these for convenience):
   + comments, `Draft → Submitted → Acknowledged`), and **Performance
   Improvement Plans** (reason/goals/period, optionally linked to a
   triggering review, `Active → Successful/Unsuccessful/Cancelled`) on
-  the Performance tab, and **Competencies + Skills** (company-scoped
-  catalogs plus per-employee ratings on a new Skills & Competencies tab,
-  gated by `training.view`/`training.manage`). See Talent Management
-  below for what's built and what's left (Training, Career development,
-  Succession planning).
+  the Performance tab, **Competencies + Skills** (company-scoped
+  catalogs plus per-employee ratings on a new Skills & Competencies tab),
+  and **Training Providers/Courses/Sessions** (a course's catalog data
+  plus its scheduled instances, `Scheduled → Completed/Cancelled`), the
+  last two gated by `training.view`/`training.manage`. See Talent
+  Management below for what's built and what's left (Training
+  Enrollment/Attendance/Certificates, Career development, Succession
+  planning).
 
 **Not started:** the remainder of Phase 15, then Phase 16 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1685,8 +1688,54 @@ defense in depth. Confirmed by re-running the exact same Playwright
 script against a cleared database and checking the saved row directly
 rather than trusting the rendered page.
 
-**Not built yet**: Training (catalog, sessions, enrollment, attendance,
-certificates — blueprint §23), Career development, Succession planning.
+**15e — Training Providers, Courses, and Sessions.** Blueprint §23 lists
+"Training catalog," "Training providers," and "Courses" as three
+functions; the catalog *is* its courses (no separate wrapper table, the
+same call Compensation made for salary bands), so this slice is two
+real lookup tables (`training_providers`, `training_courses`) plus a
+third for scheduled instances (`training_sessions`). `TrainingCourse`
+carries a nullable `training_provider_id` (validated same-company via
+`Rule::exists(...)->where('company_id', ...)`) rather than requiring
+one — a company can run its own internal training with no external
+provider. `TrainingSession.company_id` is denormalized from its course,
+the same "every level carries its own direct company_id" rule
+Organization's hierarchy already established, letting sessions be
+listed/scoped without joining through `training_courses`. "Cost"
+(blueprint's own bullet) lives on the session, not the course — a
+course's real-world cost varies by provider/session/date and is only
+known once a concrete session is scheduled.
+
+Sessions are managed entirely from `TrainingCourseController::show()`
+via add/edit modals, no index/create/edit views of their own — the same
+shape `ContributionRateTable` already established for its brackets.
+Lifecycle is `Scheduled` until `complete()`/`cancel()` moves it to one
+of two terminal states (both guarded, no path back); `update()`/
+`destroy()` are only allowed while `Scheduled`, the same "don't rewrite
+a settled record" guard `PerformanceReview`/`PerformanceImprovementPlan`
+already use. Gated by `training.view`/`training.manage` throughout,
+extending the training-subnav (`Courses`/`Providers`/`Competencies`/
+`Skills`) and lighting up the TALENT > Training sidebar placeholder
+alongside the Skills one 15d already lit.
+
+**Bug caught by browser verification, fixed before shipping:** the new
+course `show.blade.php` never rendered a `session('status')`/validation-
+error alert block, unlike every other custom (non-`<x-admin.resource-
+index>`) show page in the app (`admin.employees.show`,
+`payroll-periods.show`, `contribution-rate-tables.show`, ...) — Add
+Session appeared to silently do nothing in the browser, though the
+session row itself was in fact being created correctly each time
+(confirmed by re-running the exact same form submission twice and
+seeing two identical rows appear). `<x-admin.resource-index>` renders
+this block internally for plain list pages, but a custom show page has
+to include it itself; this one didn't. Fixed by copying the
+`@session('status')` / `$errors->any()` block `admin.employees.show`
+already uses verbatim — worth checking for on any future custom show
+page that isn't built on `<x-admin.resource-index>`.
+
+**Not built yet**: Training Enrollment, Attendance, and Certificates
+(the rest of blueprint §23 — a training session's roster, who showed
+up, and what they earned for completing it), Career development,
+Succession planning.
 
 ## Commands
 
