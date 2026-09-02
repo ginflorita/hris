@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CompensationItemController;
 use App\Http\Controllers\Admin\EmployeeAddressController;
+use App\Http\Controllers\Admin\EmployeeBenefitEnrollmentController;
 use App\Http\Controllers\Admin\EmployeeCareerDevelopmentPlanController;
 use App\Http\Controllers\Admin\EmployeeCompetencyController;
 use App\Http\Controllers\Admin\EmployeeContactController;
@@ -102,5 +103,7 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::post('succession-candidacies', [EmployeeSuccessionCandidateController::class, 'store'])->name('succession-candidacies.store');
             Route::put('succession-candidacies/{candidate}', [EmployeeSuccessionCandidateController::class, 'update'])->name('succession-candidacies.update');
             Route::delete('succession-candidacies/{candidate}', [EmployeeSuccessionCandidateController::class, 'destroy'])->name('succession-candidacies.destroy');
+
+            Route::post('benefit-enrollments', [EmployeeBenefitEnrollmentController::class, 'store'])->name('benefit-enrollments.store');
         });
     });

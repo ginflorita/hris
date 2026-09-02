@@ -204,6 +204,11 @@ class Employee extends Model
         return $this->hasMany(SuccessionCandidate::class)->orderByDesc('created_at');
     }
 
+    public function benefitEnrollments(): HasMany
+    {
+        return $this->hasMany(BenefitEnrollment::class)->orderByDesc('effective_date');
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

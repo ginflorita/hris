@@ -6,6 +6,7 @@ use App\Domain\Security\Services\DataScopeResolver;
 use App\Enums\CivilStatus;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
+use App\Models\BenefitPlan;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Competency;
@@ -99,6 +100,7 @@ class EmployeeController extends Controller
             'trainingEnrollments' => fn ($q) => $q->with('session.course'),
             'careerDevelopmentPlans' => fn ($q) => $q->with('targetPosition'),
             'successionCandidacies' => fn ($q) => $q->with('position'),
+            'benefitEnrollments' => fn ($q) => $q->with(['plan', 'coveredDependents']),
         ]);
 
         return view('admin.employees.show', [
@@ -117,6 +119,7 @@ class EmployeeController extends Controller
             'companyEmployees' => Employee::where('company_id', $employee->company_id)->orderBy('last_name')->get(),
             'companyCompetencies' => Competency::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
             'companySkills' => Skill::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
+            'benefitPlans' => BenefitPlan::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 

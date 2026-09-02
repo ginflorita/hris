@@ -19,4 +19,5 @@ require __DIR__.'/training.php';
 require __DIR__.'/leave.php';
 require __DIR__.'/compensation.php';
 require __DIR__.'/payroll.php';
+require __DIR__.'/benefits.php';
 require __DIR__.'/portal.php';

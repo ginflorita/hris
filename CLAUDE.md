@@ -241,12 +241,18 @@ non-negotiable — don't relax these for convenience):
   `performance.manage`. See Talent Management below for the full set of
   decisions, including two functions (Career development, Succession
   planning) blueprint names but never actually specifies.
+- Phase 16 (partial) — Benefits & Offboarding: **Benefits** (`BenefitPlan`
+  catalog limited to the four types not already covered elsewhere --
+  HMO/Insurance/Loan/Retirement -- plus effective-dated, append-only
+  `BenefitEnrollment` reusing the existing `EmployeeDependent` table for
+  coverage), gated by `benefits.view`/`benefits.manage`. See Benefits
+  below. Offboarding (§26) is next.
 
-**Not started:** Phase 16 (Benefits & Offboarding) onward through
-Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
-to a later phase's tables/UI before its dependencies exist. Re-read the
-relevant blueprint section before starting a phase — this file is a
-summary, not a substitute.
+**Not started:** the remainder of Phase 16 (Offboarding), then Phase 17
+onward through Phase 18. Follow the phase order in blueprint §54/§59;
+don't jump ahead to a later phase's tables/UI before its dependencies
+exist. Re-read the relevant blueprint section before starting a phase —
+this file is a summary, not a substitute.
 
 ## Authentication
 
@@ -1848,10 +1854,74 @@ generic transform.
 
 Blueprint §54's Phase 15 (Talent Management: Performance, Goals, KPIs,
 Competencies, Skills, Training, Career development, Succession
-planning) is now complete end-to-end across 15a-15g. Phase 16
-(Benefits & Offboarding) is next — re-read blueprint §54 and whichever
-of §24 (Benefits)/§26 (Offboarding) sections exist before starting it,
-the same discipline every prior phase transition in this file follows.
+planning) is now complete end-to-end across 15a-15g.
+
+## Benefits (Phase 16a)
+
+Phase 16 is "Benefits & Offboarding" (blueprint §54); this slice is
+Benefits (§21), built the same sub-slice-per-entity-group way every
+other multi-entity phase was. Offboarding (§26) is next.
+
+**Only 4 of blueprint's 8 listed "Support" types are genuinely new
+here.** §21 lists SSS, PhilHealth, Pag-IBIG, HMO, Insurance, Allowances,
+Loans, and Retirement benefits — but SSS/PhilHealth/Pag-IBIG are
+government contributions already fully modeled by `ContributionRateTable`
++ `PayrollItemContribution` (Phase 11a/11c), computed every payroll
+period, and Allowances already exist as a `CompensationItem` type
+(Phase 10). Building a second, disconnected "SSS BenefitPlan" or
+"Allowance BenefitPlan" here wouldn't track anything payroll doesn't
+already track correctly — it would just create two answers to "what's
+this employee's SSS contribution." `App\Enums\BenefitType` therefore
+has exactly four cases: `Hmo`/`Insurance`/`Loan`/`Retirement`, the ones
+with no existing home in this app.
+
+**`BenefitPlan`** (company-scoped catalog, same shape as `LeaveType`/
+`Competency`) carries `name`/`type`/`description`/`eligibility_criteria`
+(free text, not a rules engine — blueprint gives no structure for
+eligibility beyond the word itself) — deliberately *no* effective/end
+date on the plan itself. Blueprint's own "Track" field list (Plan,
+Eligibility, Enrollment, Employee contribution, Employer contribution,
+Dependents, Effective date, End date) reads as one flat list, but
+Effective date/End date describe *coverage*, not the plan definition —
+matching how every other effective-dated concept in this app
+(`Employment`, `EmployeeSchedule`, `CompensationItem`) puts its dates on
+the per-employee row, not the catalog/definition row.
+
+**`BenefitEnrollment` is effective-dated and append-only, the same
+shape as `Employment`** — `store()` closes the prior current row
+(`end_date IS NULL`) before inserting a new one, so a contribution
+change becomes a new row instead of overwriting history. The one
+difference from `Employment`: the "close the prior current row" check
+is scoped to `(employee_id, benefit_plan_id)`, not just `employee_id` —
+unlike current employment, an employee can hold several concurrent
+enrollments at once (HMO and a Loan simultaneously), so there's no
+single "current" row across *all* of an employee's benefits, only
+within one plan.
+`BenefitEnrollmentTest::test_concurrent_enrollments_in_different_plans_are_unaffected()`
+pins this down explicitly.
+
+**Dependents reuse the existing `EmployeeDependent` table (Phase 6)**
+via a `benefit_enrollment_dependents` pivot, rather than a second
+benefits-specific dependent concept — "which of this employee's
+already-recorded dependents are covered under this enrollment" is the
+same person, just flagged covered-or-not per enrollment.
+`covered_dependent_ids` is validated with
+`Rule::exists('employee_dependents','id')->where('employee_id',
+$employee->id)` so one employee's enrollment form can't attach another
+employee's dependent.
+
+Gated by `benefits.view`/`benefits.manage` — Benefits' own seeded
+permission group, no borrowing needed. Lights up the PAYROLL > Benefits
+sidebar placeholder (the plan catalog); enrollment is managed from a new
+**Benefits** tab on the employee profile page, no separate `update()`/
+`destroy()` — same "no edit, only append" restriction `EmploymentController`
+already has, for the same reason.
+
+**Bug caught by browser verification: none this slice** — every check
+(catalog CRUD, enrolling, the prior row closing exactly one day before
+the new one's effective date, a second concurrent plan being unaffected,
+covered-dependent validation and display) passed on the first Playwright
+run.
 
 ## Commands
 

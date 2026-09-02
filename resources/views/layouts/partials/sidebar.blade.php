@@ -2,8 +2,8 @@
     Mostly still static placeholders — most modules aren't built yet (see
     CLAUDE.md "Status"). WORKFORCE > Employees/Organization/Positions/COE
     Requests, TIME & ATTENDANCE > Attendance/Schedules/Shifts/Overtime/
-    Holidays/Leave, PAYROLL > Compensation, TALENT > Recruitment/
-    Applicants/Onboarding/Performance/Training/Skills, and
+    Holidays/Leave, PAYROLL > Compensation/Benefits, TALENT >
+    Recruitment/Applicants/Onboarding/Performance/Training/Skills, and
     ADMINISTRATION > Users/Roles/Permissions are real and
     permission-gated; the rest light up the same way as their phase
     lands.
@@ -74,7 +74,11 @@
                     'can' => ['organization.view'],
                     'active' => ['admin.compensation.*'],
                 ],
-                'Benefits' => null,
+                'Benefits' => [
+                    'route' => 'admin.benefits.plans.index',
+                    'can' => ['benefits.view'],
+                    'active' => ['admin.benefits.*'],
+                ],
                 'Payslips' => null,
             ],
             'TALENT' => [
