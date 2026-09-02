@@ -8,6 +8,7 @@ use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Competency;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveType;
@@ -18,6 +19,7 @@ use App\Models\PerformanceCycle;
 use App\Models\Position;
 use App\Models\SalaryGrade;
 use App\Models\Schedule;
+use App\Models\Skill;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,6 +94,8 @@ class EmployeeController extends Controller
             'performanceGoals' => fn ($q) => $q->with('performanceCycle'),
             'performanceReviews' => fn ($q) => $q->with(['performanceCycle', 'reviewer']),
             'performanceImprovementPlans' => fn ($q) => $q->with(['performanceReview', 'initiatedBy']),
+            'employeeCompetencies' => fn ($q) => $q->with(['competency', 'assessedBy']),
+            'employeeSkills' => fn ($q) => $q->with(['skill', 'assessedBy']),
         ]);
 
         return view('admin.employees.show', [
@@ -108,6 +112,8 @@ class EmployeeController extends Controller
             'onboardingTemplates' => OnboardingTemplate::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
             'performanceCycles' => PerformanceCycle::where('company_id', $employee->company_id)->orderByDesc('start_date')->get(),
             'companyEmployees' => Employee::where('company_id', $employee->company_id)->orderBy('last_name')->get(),
+            'companyCompetencies' => Competency::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
+            'companySkills' => Skill::where('company_id', $employee->company_id)->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 

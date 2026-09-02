@@ -179,6 +179,16 @@ class Employee extends Model
         return $this->hasMany(PerformanceImprovementPlan::class)->orderByDesc('start_date');
     }
 
+    public function employeeCompetencies(): HasMany
+    {
+        return $this->hasMany(EmployeeCompetency::class);
+    }
+
+    public function employeeSkills(): HasMany
+    {
+        return $this->hasMany(EmployeeSkill::class);
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

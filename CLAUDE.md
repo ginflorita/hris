@@ -227,10 +227,12 @@ non-negotiable — don't relax these for convenience):
   **Performance Reviews** (self/manager/peer, one table by `type`, rating
   + comments, `Draft → Submitted → Acknowledged`), and **Performance
   Improvement Plans** (reason/goals/period, optionally linked to a
-  triggering review, `Active → Successful/Unsuccessful/Cancelled`), all
-  on the Performance tab on the employee profile page. See Talent
-  Management below for what's built and what's left (Competencies,
-  Skills, Training, Career development, Succession planning).
+  triggering review, `Active → Successful/Unsuccessful/Cancelled`) on
+  the Performance tab, and **Competencies + Skills** (company-scoped
+  catalogs plus per-employee ratings on a new Skills & Competencies tab,
+  gated by `training.view`/`training.manage`). See Talent Management
+  below for what's built and what's left (Training, Career development,
+  Succession planning).
 
 **Not started:** the remainder of Phase 15, then Phase 16 onward through
 Phase 18. Follow the phase order in blueprint §54/§59; don't jump ahead
@@ -1622,9 +1624,69 @@ after a verification-script check came back a false negative from the
 same class of timing issue as 15b's (checking page content immediately
 after a redirect, before navigating back to the Performance tab).
 
-**Not built yet**: Competencies, Skills, Training (catalog, sessions,
-enrollment, attendance, certificates — blueprint §23), Career
-development, Succession planning.
+**15d — Competencies + Skills.** Blueprint's own table of contents
+groups these under one heading ("Skills & Competencies"), but they're
+kept as two separate tables (`competencies`, `skills`), not collapsed
+into one with a `type` enum the way `PerformanceReview`'s self/manager/
+peer or `CompensationItem`'s allowance/bonus/incentive are -- those
+collapses all share one downstream consumer that treats the variants
+interchangeably; a skill and a competency don't (blueprint §23 ties
+skills to training/certificates/expiration reminders, a role
+competencies don't play), so collapsing them would just produce a table
+whose rows mean two different things and that most queries would have
+to filter on anyway. Both are plain company-scoped lookups, same shape
+as `LeaveType`/`Holiday`, unique on `(company_id, name)` rather than a
+code (nothing cross-references either by a compact code the way
+Organization's hierarchy entities do). Gated by `training.view`/
+`training.manage` -- Training already has its own seeded permission
+group (unlike Compensation), and blueprint §23 is the more natural
+long-term owner of this catalog even though it's shipping ahead of the
+Training module itself, the same "borrow the permission whose shape
+fits" reasoning applied one module early.
+
+Per-employee ratings (`EmployeeCompetency`/`EmployeeSkill`) share one
+`App\Enums\ProficiencyLevel` (Beginner/Intermediate/Advanced/Expert) --
+unlike the parent catalog tables, the *rating* concept genuinely is the
+same shape for both, so the enum is reused rather than duplicated. One
+row per employee per competency/skill, corrected in place on
+reassessment rather than append-only (`Attendance`'s "correct in place"
+precedent, not `Employment`'s -- nothing requires preserving every past
+rating the way compensation/employment history must). The unique
+`(employee_id, competency_id)` / `(employee_id, skill_id)` index is
+mirrored in validation via `Rule::unique(...)->ignore(...)`, turning a
+duplicate rating into a friendly form error instead of the raw
+`QueryException` CLAUDE.md's Attendance section already documents
+catching once for Holiday's date uniqueness. Managed from a new
+**Skills & Competencies** tab on the employee profile page, lighting up
+the TALENT > Skills sidebar placeholder.
+
+**Two real bugs caught by browser verification, both fixed before
+shipping, neither the one first suspected.** The Add Competency and Add
+Skill modals share one fields partial (`_capability-rating-fields.blade
+.php`); Playwright's first full run showed a skill rating saved with the
+*previous* competency rating's `assessed_at`/`assessed_by` despite the
+skill form never touching those fields. The first fix attempted --
+folding `$kind` into the partial's `id="..."` attributes, since both
+"new" forms shared ids like `assessed_at_new` -- was a real, worth-fixing
+issue (duplicate ids are invalid HTML and break `<label for>`) but
+didn't change the actual symptom on retest, proving it wasn't the cause.
+The real cause: `_skills-competencies.blade.php` used the same loop
+variable name (`$rating`) for both the competency and skill `@foreach`
+blocks, and Blade's `@include` shares the *calling* template's variable
+scope by default -- the Add Skill modal's `@include(...)` never passed
+its own `rating` key, so it silently inherited whatever `$rating` still
+held from the competency edit-modals' `@foreach` earlier in the same
+file (PHP doesn't scope `foreach` variables to the loop). Fixed by
+renaming the loop variables to `$competencyRating`/`$skillRating` and
+having every "Add" modal's `@include` pass `'rating' => null` explicitly
+rather than relying on the partial's `$rating ?? null` default -- both
+changes independently close this class of bug, kept together for
+defense in depth. Confirmed by re-running the exact same Playwright
+script against a cleared database and checking the saved row directly
+rather than trusting the rendered page.
+
+**Not built yet**: Training (catalog, sessions, enrollment, attendance,
+certificates — blueprint §23), Career development, Succession planning.
 
 ## Commands
 

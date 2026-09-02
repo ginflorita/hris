@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CompensationItemController;
 use App\Http\Controllers\Admin\EmployeeAddressController;
+use App\Http\Controllers\Admin\EmployeeCompetencyController;
 use App\Http\Controllers\Admin\EmployeeContactController;
 use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\EmployeeDependentController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Admin\EmployeePerformanceGoalController;
 use App\Http\Controllers\Admin\EmployeePerformanceImprovementPlanController;
 use App\Http\Controllers\Admin\EmployeePerformanceReviewController;
 use App\Http\Controllers\Admin\EmployeeScheduleController;
+use App\Http\Controllers\Admin\EmployeeSkillController;
 use App\Http\Controllers\Admin\EmploymentController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
 use Illuminate\Support\Facades\Route;
@@ -80,5 +82,13 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
             Route::put('performance-improvement-plans/{plan}', [EmployeePerformanceImprovementPlanController::class, 'update'])->name('performance-improvement-plans.update');
             Route::put('performance-improvement-plans/{plan}/close', [EmployeePerformanceImprovementPlanController::class, 'close'])->name('performance-improvement-plans.close');
             Route::delete('performance-improvement-plans/{plan}', [EmployeePerformanceImprovementPlanController::class, 'destroy'])->name('performance-improvement-plans.destroy');
+
+            Route::post('competencies', [EmployeeCompetencyController::class, 'store'])->name('competencies.store');
+            Route::put('competencies/{employeeCompetency}', [EmployeeCompetencyController::class, 'update'])->name('competencies.update');
+            Route::delete('competencies/{employeeCompetency}', [EmployeeCompetencyController::class, 'destroy'])->name('competencies.destroy');
+
+            Route::post('skills', [EmployeeSkillController::class, 'store'])->name('skills.store');
+            Route::put('skills/{employeeSkill}', [EmployeeSkillController::class, 'update'])->name('skills.update');
+            Route::delete('skills/{employeeSkill}', [EmployeeSkillController::class, 'destroy'])->name('skills.destroy');
         });
     });
