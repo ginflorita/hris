@@ -254,12 +254,18 @@ non-negotiable — don't relax these for convenience):
   and the rest (final payroll, COE, separation) left as documented,
   deliberate gaps. See Benefits and Offboarding below.
 
-**Not started:** Phase 17 (Security Hardening & OWASP Verification)
-onward through Phase 18 (Production, Backup & Disaster Recovery). Follow
-the phase order in blueprint §54/§59; don't jump ahead to a later
-phase's tables/UI before its dependencies exist. Re-read the relevant
-blueprint section before starting a phase — this file is a summary, not
-a substitute.
+- Phase 17 (partial) — Security Hardening & OWASP Verification:
+  **Security headers** (a new `SecurityHeaders` middleware setting CSP/
+  X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-
+  Policy/conditional HSTS on every response, deliberately tuned — not
+  blindly strict — to this app's real inline-script/inline-style/Alpine
+  usage). See Security Hardening below.
+
+**Not started:** the remainder of Phase 17, then Phase 18 (Production,
+Backup & Disaster Recovery). Follow the phase order in blueprint
+§54/§59; don't jump ahead to a later phase's tables/UI before its
+dependencies exist. Re-read the relevant blueprint section before
+starting a phase — this file is a summary, not a substitute.
 
 ## Authentication
 
@@ -2048,6 +2054,86 @@ any further navigation. Ground-truthed against the real sequence after
 both fixes: all ten steps advanced correctly end-to-end, `approved_at`/
 `approved_by` were stamped at `Approved`, and the linked `User` account's
 `disabled_at` was confirmed non-null via `tinker` after `AccountDisabled`.
+
+## Security Hardening (Phase 17, in progress)
+
+Blueprint §54's Phase 17 is "Security Hardening & OWASP Verification"
+(§49-53: OWASP Top 10:2025, ASVS 5.0, a long per-topic checklist, and a
+final verification matrix). CLAUDE.md's own header already states the
+governing principle: **security is built continuously, not bolted on
+here** — RBAC, data scope, MFA, session security, CSRF (Laravel's
+default), object-level payslip/document ownership, login throttling,
+and login/failed-login/payslip-access logging are all already in place
+from Phases 3/4/12/13. Phase 17 is verification of those controls
+(finding and closing real gaps) plus the handful of genuinely new
+cross-cutting pieces blueprint §51 calls for that nothing earlier had a
+reason to build yet. Built as sub-slices like every other multi-part
+phase.
+
+**17a — Security headers.** A new `App\Http\Middleware\SecurityHeaders`,
+appended to the `web` middleware group in `bootstrap/app.php` (not a
+route-level alias like `auth.session`/`mfa.superadmin` — headers belong
+on every browser-facing response including guest/login/error pages, not
+just authenticated ones), sets Content-Security-Policy,
+X-Content-Type-Options, X-Frame-Options, Referrer-Policy,
+Permissions-Policy, and — conditionally, only when `$request->secure()`
+— Strict-Transport-Security (blueprint §51 17.13 explicitly scopes HSTS
+to "where appropriate"; sending it over plain HTTP in local/sandbox dev
+would be actively wrong, not just unnecessary).
+
+**The CSP's `script-src`/`style-src` include `'unsafe-inline'`, and
+`script-src` also includes `'unsafe-eval'` — a deliberate, documented
+trade-off, not an oversight.** Blueprint §51 17.14 explicitly warns
+"Do not blindly copy a CSP from another application. Tune it for the
+actual frontend resources" — so before writing the policy, the actual
+frontend was audited: `layouts/partials/head.blade.php` has a genuine
+inline `<script>` that sets `data-bs-theme` before first paint (avoiding
+a flash of the wrong theme, can't wait for the bundled JS to load);
+~10 admin views use inline `onchange="this.form.submit()"` on filter
+`<select>`s; ~80 views use inline `style="width: …%"` for progress bars
+(Onboarding/Training/PIP-adjacent cards); and Alpine.js (`x-data`/
+`@click`, used on the 2FA challenge and Security pages) evaluates its
+directive expressions via `new Function()` internally, which CSP's
+`'unsafe-eval'` restriction exists specifically to block. A strict
+policy omitting these would silently break the theme toggle, every
+auto-submit filter dropdown, and both Alpine interactions — CSP
+violations fail silently in the browser console, not as a visible error,
+so shipping a policy that merely *looks* strict without checking against
+real usage would be worse than an honest one: a false sense of
+protection. The real fix for each (nonce the theme script, convert
+`onchange` attributes to `addEventListener`, migrate to the restricted
+`@alpinejs/csp` build and rewrite every existing directive) is a genuine
+follow-up, not done here — noted rather than silently deferred, the same
+restraint CLAUDE.md already applies to Leave's accrual scheduler and
+Payroll's overtime-pay gap. `object-src 'none'`, `base-uri 'self'`,
+`form-action 'self'`, and `frame-ancestors 'self'` are all real,
+unweakened restrictions — nothing about this app needed them loosened.
+
+**Verified with Playwright, not just by reading the policy string**:
+logged in as a plain non-Superadmin test user (Superadmin would have
+redirected to `/security` for mandatory MFA setup before reaching any of
+the pages under test, per `EnsureSuperadminHasTwoFactorEnabled` —
+irrelevant to what this slice needed to check), a console listener
+watching for `Content Security Policy`/`Refused to` messages across
+login, an Alpine `@click` interaction, and an `onchange` auto-submit
+filter that visibly re-navigated with a query string — zero violations
+across all of them, confirming the policy neither over-blocks the real
+frontend nor is silently doing nothing.
+
+`SecurityHeadersTest` (`tests/Feature/Security/`, the same directory
+`SessionManagementTest` already established in Phase 3) pins down the
+headers present on both a guest and an authenticated route, the
+HSTS-only-over-HTTPS behavior specifically (simulated in-test by
+requesting an `https://` URL, which Symfony's `Request::create()` reads
+the scheme from directly rather than needing a manual server-variable
+override), and that `object-src`/`base-uri`/`frame-ancestors` are
+genuinely restricted in the emitted policy string.
+
+**Not addressed by this slice**: removing the `X-Powered-By`/`Server`
+response headers PHP-FPM/nginx add by default — that's `expose_php =
+Off` and `server_tokens off`, infrastructure-level config that belongs
+to Phase 18 ("Nginx/PHP-FPM" deployment), not something a Laravel
+middleware can control.
 
 ## Commands
 

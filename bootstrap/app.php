@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureSuperadminHasTwoFactorEnabled;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,6 +20,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // sessions, so they'd silently keep working forever.
             'auth.session' => AuthenticateSession::class,
             'mfa.superadmin' => EnsureSuperadminHasTwoFactorEnabled::class,
+        ]);
+
+        // Every browser-facing response, not just authenticated ones —
+        // login/2FA/password-reset pages need these headers too.
+        $middleware->web(append: [
+            SecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
