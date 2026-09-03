@@ -259,12 +259,15 @@ non-negotiable — don't relax these for convenience):
   X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-
   Policy/conditional HSTS on every response, deliberately tuned — not
   blindly strict — to this app's real inline-script/inline-style/Alpine
-  usage) and a **generic Audit Log** (`audit_logs` + `AuditLogger`,
+  usage), a **generic Audit Log** (`audit_logs` + `AuditLogger`,
   wired at eight sensitive mutation points named by blueprint §51
   17.24 — user creation/role changes/disable-enable, role permission
   changes, salary changes, payroll finalization — gated by the
-  long-reserved `audit-logs.view` permission). See Security Hardening
-  below.
+  long-reserved `audit-logs.view` permission), and a **Broken Access
+  Control / IDOR test suite** (`BrokenAccessControlTest`, one file
+  walking blueprint §51 17.4/17.5's named scenarios end to end; every
+  assertion passed on the first run — confirmation, not a fix). See
+  Security Hardening below.
 
 **Not started:** the remainder of Phase 17, then Phase 18 (Production,
 Backup & Disaster Recovery). Follow the phase order in blueprint
@@ -2246,6 +2249,45 @@ a correctly-shaped row (actor, `Disabled` badge, `User Management`
 module, `User #<id>` record, `disabled_at: (active) → <timestamp>`
 change line) visible on the index page and survivable through the
 module filter.
+
+**17c — Broken access control / IDOR test suite.** Blueprint §51 17.4
+and 17.5 name specific scenarios to test (`Employee → Other Employee`,
+`Employee → Other Payslip`, `Employee → Payroll`, `Employee → HR
+Documents`, `Manager → Other Department`, `HR Staff → Security
+Settings`, `Payroll Staff → User Administration`; ID-tampering against
+`/employees/100`, `/payslips/100`, `/documents/100`, `/payroll/100`,
+`/leave/100`) — this slice is purely test-writing, no application code
+changed, since (per this file's own opening principle) the controls
+being verified were already built as their owning phases landed: RBAC
+permission gating, `DataScopeResolver`'s Team scope for Manager, and
+per-record `employee_id === auth()->user()->employee_id` ownership
+checks on every portal controller (documents, payslips, leave, COE).
+
+**One file, `tests/Feature/Security/BrokenAccessControlTest.php`,
+walks blueprint's literal scenario list end to end** rather than
+scattering new assertions across existing test files — the
+consolidation itself is this slice's value: a reviewer can read one
+file top to bottom and check off every named item, even where deeper
+behavioral coverage already exists elsewhere (`DataScopeTest` for
+Manager/Team scope, `PayslipPortalTest` for payslip ownership) and only
+gets one confirming boundary test here rather than a duplicated deep
+suite. `test_changing_the_id_to_an_owned_record_still_succeeds` is a
+deliberate positive control paired with the negative IDOR assertions —
+a 404 is only meaningful proof of an ownership check if the same route
+returns 200 for the actual owner; without it, a 404 could just as
+easily mean the route or fixture was wrong.
+
+**One real finding, not a vulnerability**: `HR Staff`/`Payroll
+Administrator → User Administration` and `Employee → Payroll`/`→ HR
+Documents` were all already correctly blocked purely by the seeded
+permission catalog (`RoleAndPermissionSeeder::ROLES`) having never
+granted `users.*`/`roles.*` to either role, and `Employee` never having
+been granted `employees.view`/`payroll.*` — every assertion in this
+file passed on the first run, confirming rather than fixing. Worth
+recording precisely because a security-hardening phase finding nothing
+to fix is itself the expected, successful outcome of CLAUDE.md's
+"security is built continuously" principle, not a sign the phase did
+nothing.
 
 ## Commands
 
