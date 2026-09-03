@@ -4,7 +4,8 @@
     Requests/Offboarding, TIME & ATTENDANCE > Attendance/Schedules/
     Shifts/Overtime/Holidays/Leave, PAYROLL > Compensation/Benefits,
     TALENT > Recruitment/Applicants/Onboarding/Performance/Training/
-    Skills, and ADMINISTRATION > Users/Roles/Permissions are real and
+    Skills, REPORTS > Overview/HR Reports/Attendance Reports/Leave
+    Reports, and ADMINISTRATION > Users/Roles/Permissions are real and
     permission-gated; the rest light up the same way as their phase
     lands.
 --}}
@@ -115,7 +116,14 @@
                 ],
                 'Career' => null,
             ],
-            'REPORTS' => ['HR Reports', 'Attendance Reports', 'Leave Reports', 'Payroll Reports', 'Analytics'],
+            'REPORTS' => [
+                'Overview' => ['route' => 'admin.reports.index', 'can' => ['reports.view']],
+                'HR Reports' => ['route' => 'admin.reports.hr.index', 'can' => ['reports.view']],
+                'Attendance Reports' => ['route' => 'admin.attendance.report.index', 'can' => ['attendance.view']],
+                'Leave Reports' => ['route' => 'admin.leave.report.index', 'can' => ['leave.view']],
+                'Payroll Reports' => null,
+                'Analytics' => null,
+            ],
             'ADMINISTRATION' => [
                 'Users' => ['route' => 'admin.users.index', 'can' => ['viewAny', \App\Models\User::class]],
                 'Roles' => ['route' => 'admin.roles.index', 'can' => ['viewAny', \App\Models\Role::class]],

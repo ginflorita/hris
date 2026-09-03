@@ -21,4 +21,5 @@ require __DIR__.'/compensation.php';
 require __DIR__.'/payroll.php';
 require __DIR__.'/benefits.php';
 require __DIR__.'/offboarding.php';
+require __DIR__.'/reports.php';
 require __DIR__.'/portal.php';

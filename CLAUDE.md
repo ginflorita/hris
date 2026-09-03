@@ -304,6 +304,24 @@ follow-up, not a silent omission; there is no separate "not started"
 phase left to point to. Re-read the relevant phase section above (this
 file is a summary, not a substitute) before extending any area further.
 
+- Phase 19 (in progress) — Reports & Analytics: blueprint §3 names eight
+  report/analytics modules (items 53-60: HR, Payroll, Attendance, Leave,
+  Recruitment, Performance, Training Reports, plus Workforce Analytics)
+  and §55's own "V1 MVP" list names Reports as item 19 of 21 — but
+  blueprint never gives Reports a numbered detail section (confirmed by
+  grep before starting: of the modules named without one, only
+  "Workflow Engine" also has none) and never assigns it to one of §54's
+  Phase 1-18 despite listing it as V1-scoped, the same "named but never
+  scheduled" gap Career Development/Succession Planning (Phase 15g)
+  turned out to be. With §54's own list now fully built, this is the
+  session's own continuation past it — numbered Phase 19 to keep the
+  same phase-lettering convention (19a, 19b, ...) every other
+  multi-slice phase used rather than leaving it unlabeled. First slice
+  (19a) done: a Reports landing page and an HR Report (headcount by
+  department/employment type/status), both gated by the long-reserved
+  `reports.view` permission nothing had checked until now. See Reports
+  below.
+
 ## Authentication
 
 Backend is Laravel Fortify (`laravel/fortify`), used **headless** — we
@@ -2493,7 +2511,7 @@ monitoring integration, and third-party penetration testing/vulnerability
 scanning — is Phase 18's job or a real deployment's own security review,
 not a gap in this phase's own scope.
 
-## Production, Backup & Disaster Recovery (Phase 18, in progress)
+## Production, Backup & Disaster Recovery (Phase 18, complete)
 
 Blueprint §54's final phase. Unlike every prior phase, most of its
 bullets (Nginx/PHP-FPM, monitoring, CI/CD, disaster recovery) describe
@@ -2818,6 +2836,105 @@ codebase up next, not a silent omission. CLAUDE.md itself, not a
 separate document, is the accounting of what's built versus what's a
 documented, deliberate gap — read the phase section for the area being
 touched before assuming either.
+
+## Reports (Phase 19, in progress)
+
+Blueprint §3 lists eight report/analytics modules (items 53-60: HR,
+Payroll, Attendance, Leave, Recruitment, Performance, Training Reports,
+plus Workforce Analytics) and §55's own "V1 MVP" list names Reports as
+item 19 of 21 — but, confirmed by grep before starting, blueprint never
+gives Reports a numbered detail section (only "Workflow Engine" has one
+among the modules named without a phase) and never assigns it to any of
+§54's Phase 1-18 despite listing it as V1-scoped. Blueprint's own
+V1/V2 split (§55) puts Reports in V1 and Recruitment/Performance/
+Training/Benefits/Career/Succession in V2, but this project's actual
+build order never gated on that split — Phases 14-16 built every one of
+those "V2" modules well before Reports, a "V1" item, is being built now.
+Not a correction to make retroactively, just a note that this project's
+phase order was never meant to mirror blueprint's V1/V2 grouping. With
+§54's own phase list fully built (see Status above), Phase 19 is this
+session's own continuation past it, kept in the same lettered-slice
+shape (19a, 19b, ...) every other multi-part phase already used.
+
+**19a — Reports landing page + HR Report.** `Admin\ReportController::index()`
+is the front door at `/admin/reports`, gated by `reports.view` — a
+permission seeded since `RoleAndPermissionSeeder` was first written but,
+confirmed by grep before this slice, never checked anywhere in the app
+until now, the same "permission exists, nothing's granted/checked yet"
+pattern `organization.manage` and `audit-logs.view` were before their
+own phases. It's a card grid linking to each report type; a card shows
+a real "View" link when the viewer both can reach the route and holds
+its permission, or a "Coming soon" badge otherwise (`Route::has()` +
+`can()`, the same check the sidebar itself already uses) — so the page
+degrades correctly per-viewer rather than assuming every viewer sees
+the same set.
+
+**HR Report** (`Admin\HrReportController`, `admin.reports.hr.index`) is
+new this slice: active/archived employee counts plus a company-
+filterable breakdown by department, employment type, and status. Reads
+straight through `Employee`/`Employment`/`Department` — no new tables,
+the same "query existing data" restraint every report in this app
+follows, `AttendanceReportController`/`LeaveReportController` (Phases
+8/9) included. Grouping keys off `Employee::currentEmployment` (Phase
+7's "exactly one source of truth for current" relation) with explicit
+fallback labels (`'Unassigned'` for no department, `'unassigned'`/
+`'no_current_employment'` for no current employment at all) rather than
+silently dropping employees with no current employment row from the
+breakdown entirely.
+
+**Employment type/status display reuses the existing inline transform,
+not a new `label()` method.** `EmploymentType`/`EmploymentStatus` have
+no `label()` — this app's two existing displays of these exact enums
+(`admin.employees.show`'s Overview and Employment tabs) already render
+them with `ucwords(str_replace('_', ' ', $value->value))` inline in
+Blade. The controller groups by the raw `->value` and the view applies
+that same transform, rather than introducing a third way to display an
+enum this app already has two consistent displays of — Phase 15g's
+"enum owns its display string via `label()`" call was for a case
+(`SuccessionReadiness`) where no existing convention produced correct
+output; here one already does, so matching it is more consistent than
+adding a second convention.
+
+**`AttendanceReportController`/`LeaveReportController` keep their own
+`attendance.view`/`leave.view` gates, unchanged** — both already existed
+(Phases 8/9) and are reachable from their own module's subnav; this
+slice only adds them to the sidebar's REPORTS section and this new
+landing page as a convenience, gated in both places by the same
+permission the controller itself already checks. Regating either to
+`reports.view` would have been a silent access change (narrowing it for
+Attendance Officer/whoever holds the module permission but not
+`reports.view`, or widening it the other way) that nothing asked for.
+
+**Sidebar REPORTS section** (previously five bare-string placeholders
+since Phase 2) now has four real entries — `Overview` (the landing
+page), `HR Reports`, `Attendance Reports`, `Leave Reports` — each gated
+by the same permission its own controller checks, plus `Payroll
+Reports`/`Analytics` staying disabled placeholders until 19b/19d. The
+landing page's own "Overview" row avoids reusing the literal label
+"Reports" a second time directly under the "REPORTS" section title,
+the same reasoning `Organization`'s sidebar entry doesn't say
+"Companies" even though that's the route it points at — the label names
+the concept, not the route.
+
+**Verified with Playwright against real seeded data**, logged in as a
+throwaway HR Administrator account (not Superadmin — HR Administrator
+holds `reports.view`/`leave.view` but deliberately not `attendance.view`,
+confirmed against the seeder rather than assumed, which made a real,
+correct negative case: the landing page's Attendance Reports card
+correctly showed "Coming soon" for this viewer and the sidebar entry
+was correctly disabled, not a bug): the landing page rendered all five
+cards with the right link/badge split, the HR report's three breakdown
+tables matched a hand-computed expectation across mixed seeded data
+(employees with and without a current employment row, across two
+departments), and the company filter's `onchange="this.form.submit()"`
+auto-submit correctly re-filtered the page. No console errors.
+
+**Bug caught: none in the application.** The one issue during
+verification was in the Playwright script itself — `page.click('text=View')`
+against a page with multiple "View" links didn't reliably land on the
+intended card, fixed by asserting on each link's actual `href` and
+navigating directly instead of clicking, a scripting fix, not an app
+one.
 
 ## Commands
 
