@@ -279,7 +279,7 @@ non-negotiable — don't relax these for convenience):
   hardening, CI/CD, monitoring integration, penetration testing,
   vulnerability scanning).
 
-- Phase 18 (partial) — Production, Backup & Disaster Recovery:
+- Phase 18 (complete) — Production, Backup & Disaster Recovery:
   **Scheduler** (Laravel's scheduler wired up for the first time in
   this app; `leave:accrue`/`leave:carry-over` close the Leave accrual
   gap Phase 9 documented, `training:send-certificate-expiration-
@@ -287,18 +287,22 @@ non-negotiable — don't relax these for convenience):
   queued notifications** (`SecurityAlert`/`PayslipPublished`/
   `TrainingCertificateExpiring` now implement `ShouldQueue`, verified
   genuinely queued against the real `database` queue connection, not
-  just interface-compliant), and **encrypted backup + restore
-  testing** (`backup:run`/`backup:restore`/`backup:verify-latest`,
-  covering database + private files + `.env`, checksum-verified,
-  restore ground-truthed against real application data end to end).
-  See Production, Backup & Disaster Recovery below.
+  just interface-compliant), **encrypted backup + restore testing**
+  (`backup:run`/`backup:restore`/`backup:verify-latest`, covering
+  database + private files + `.env`, checksum-verified, restore
+  ground-truthed against real application data end to end), and
+  **production deployment config + a deployment/disaster-recovery
+  runbook** (`deploy/{nginx,php-fpm,supervisor}/`,
+  `.env.production.example`, `DEPLOYMENT.md` — CI/CD confirmed already
+  in place since this project's first commit, not rebuilt). See
+  Production, Backup & Disaster Recovery below.
 
-**Not started:** the remainder of Phase 18 — production deployment
-config (Nginx/PHP-FPM, the queue worker process itself), CI/CD, and
-disaster recovery documentation. Follow the phase order in blueprint
-§54/§59; don't jump ahead to a later phase's tables/UI before its
-dependencies exist. Re-read the relevant blueprint section before
-starting a phase — this file is a summary, not a substitute.
+**Blueprint §54's full phase list (Phase 1 through Phase 18) is
+complete.** Every deliberate, documented gap named along the way —
+each phase's own section above names its own — remains a real, sized
+follow-up, not a silent omission; there is no separate "not started"
+phase left to point to. Re-read the relevant phase section above (this
+file is a summary, not a substitute) before extending any area further.
 
 ## Authentication
 
@@ -2711,6 +2715,109 @@ against) and streaming encryption for very large databases
 genuinely large production database would need to pipe `mysqldump`
 through something like `openssl enc` instead). Both are real, sized
 follow-ups, not silent gaps.
+
+**18d — Production deployment config, CI/CD, and the deployment/
+disaster-recovery runbook, closing Phase 18 and blueprint §54's full
+phase list.** Blueprint's remaining Phase 18 bullets (Nginx/PHP-FPM,
+production deployment, disaster recovery procedure, CI/CD, deployment
+procedure, rollback procedure) are mostly config and process, not
+application code — this slice's own file mix reflects that.
+
+**CI/CD was already done, not built here** —
+`.github/workflows/tests.yml` (a `tests` job matrixed across PHP
+8.3/8.4 against SQLite, plus a `lint` job running `vendor/bin/pint
+--test`, both on every push to `main` and every pull request) has
+existed since this project's very first commit, confirmed by `git log`
+before assuming there was a gap to fill. Documented here, in
+`DEPLOYMENT.md`, and in the Status bullet below rather than silently
+rebuilding or re-claiming it.
+
+**`deploy/`** holds three config files written for the actual target
+this app's own code already assumes (PHP 8.3+, MySQL 8+/Redis in
+production per the Stack section, `storage/app/private/` never
+web-accessible per the Employee section) but genuinely untestable in
+this environment — no `nginx`, `php-fpm`, or `supervisord` binary
+exists here to validate syntax against, stated plainly in each file's
+own header rather than silently presented as verified:
+- **`nginx/hris.conf`** — HTTP→HTTPS redirect (leaving the ACME
+  challenge path open), TLS termination, and a `location ~ \.php$`
+  block marked `internal` so a client can never request an arbitrary
+  `.php` file directly (blocking the "upload a file, then request it
+  to get it executed" attack path at the web-server layer, independent
+  of and ahead of the application's own upload validation) while the
+  legitimate internal rewrite from `try_files` still reaches
+  `index.php` normally. Explicitly does *not* duplicate the
+  application's own security headers (`SecurityHeaders` middleware,
+  17a) beyond HSTS on static-asset responses that never reach PHP at
+  all — setting the same header at two layers risks them silently
+  disagreeing later.
+- **`php-fpm/hris.conf`** — a dedicated, unprivileged pool user (never
+  `www-data` shared with other sites, never root — blueprint §51
+  17.21's least-privilege principle applied to the OS process, not just
+  the database user), `display_errors`/`expose_php` off, and an
+  `upload_max_filesize`/`post_max_size` kept in sync with
+  `EmployeeDocumentController`'s/`ApplicantController`'s own
+  `max:10240` validation rules.
+- **`supervisor/hris-worker.conf`** — the queue-worker *process*
+  Phase 18b's `ShouldQueue` notifications explicitly deferred to this
+  slice: two `queue:work` processes, auto-restarting, so queued
+  notifications don't just sit in the `jobs` table indefinitely.
+
+**`.env.production.example`** contrasts deliberately with
+`.env.example` rather than replacing it — that file's local-friendly
+defaults (`APP_DEBUG=true`, `MAIL_MAILER=log`, SQLite fallback
+commented in) are correct for what it's for, and this file's
+production-hardened ones (`APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`,
+a real mail transport, MySQL/Redis required) are correct for what
+*this* one is for; neither is a bug in the other.
+`ProductionEnvironmentTemplateTest` parses it with the same `Dotenv`
+library Laravel itself uses and pins down the values that would be a
+genuine security regression if silently reverted later — most
+pointedly `APP_DEBUG=false`, guarding in the one place a coding session
+actually can enforce that blueprint §51 17.19 rule, since CLAUDE.md's
+own Security Hardening section already explains why application code
+itself cannot.
+
+**`DEPLOYMENT.md`** is the step-by-step: initial deployment, deploying
+an update, rollback (favoring forward-fixing over `migrate:rollback`,
+consistent with this app's own "never overwrite historical data"
+rules — most of its migrations are additive-only specifically so a
+rollback is rarely the safe move), and disaster recovery (the actual
+procedure for turning Phase 18c's `backup:restore` output into a
+restored live system — stop the app, restore into a scratch directory,
+verify, *then* sync into the live paths, matching exactly why
+`backup:restore` itself deliberately stops short of doing that last
+step automatically). It also names the one genuine gap honestly rather
+than assuming it solved: this app has no off-host backup shipping
+(encrypted backups stay on the same host under `storage/app/backups/`
+unless something else moves them off it — a real requirement for
+surviving the primary host itself failing, which needs knowledge of a
+specific deployer's actual off-host storage this codebase can't
+provide generically).
+
+**Monitoring/error monitoring stays a documented, honest gap, not a
+fabricated integration.** This app already provides real, working
+audit trails with no external service needed (`login_logs`,
+`payslip_access_logs`, `audit_logs`, three email notifications) — but
+genuine uptime/error-rate/APM monitoring needs a real external service
+(Sentry, Bugsnag, a hosted log aggregator) with its own account and
+credentials no coding session can provision for an unknown future
+deployer. `config/logging.php` already supports adding a monitoring
+channel with zero application code changes once a deployer has
+credentials — a configuration step, not a code gap.
+
+Blueprint §54's full phase list (Phase 1 through Phase 18) is now
+complete end-to-end. This does not mean every individual blueprint
+bullet across all 18 phases has a built implementation — every
+deliberate, documented gap called out along the way (Leave's
+`PerPayPeriod` accrual, Payroll's overtime/holiday-pay rates, async
+payroll processing, backup off-host shipping, external monitoring
+integration, and others each phase's own section names) remains
+exactly that: a real, sized, named follow-up for whoever picks this
+codebase up next, not a silent omission. CLAUDE.md itself, not a
+separate document, is the accounting of what's built versus what's a
+documented, deliberate gap — read the phase section for the area being
+touched before assuming either.
 
 ## Commands
 
