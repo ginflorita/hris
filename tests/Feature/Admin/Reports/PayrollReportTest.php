@@ -87,6 +87,18 @@ class PayrollReportTest extends TestCase
                 && (float) $rows['sss']['employer'] === 380.0);
     }
 
+    public function test_payroll_report_breaks_a_tied_start_date_by_the_newest_period(): void
+    {
+        $company = Company::factory()->create();
+        $older = PayrollPeriod::factory()->for($company, 'company')->create(['start_date' => '2026-01-01', 'end_date' => '2026-01-31']);
+        $newer = PayrollPeriod::factory()->for($company, 'company')->create(['start_date' => '2026-01-01', 'end_date' => '2026-01-31']);
+
+        $this->actingAs($this->payrollAdmin())
+            ->get(route('admin.reports.payroll.index'))
+            ->assertOk()
+            ->assertViewHas('selectedPeriod', fn ($period) => $period->id === $newer->id);
+    }
+
     public function test_payroll_report_defaults_to_the_most_recent_period_when_none_is_selected(): void
     {
         $company = Company::factory()->create();

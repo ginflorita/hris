@@ -33,6 +33,7 @@ class PayrollReportController extends Controller
         $periods = PayrollPeriod::query()
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->orderByDesc('start_date')
+            ->orderByDesc('id')
             ->get();
 
         $selectedPeriodId = $request->integer('payroll_period_id');

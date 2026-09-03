@@ -16,6 +16,9 @@
             ['label' => 'Attendance Reports', 'description' => 'Presence, lateness, undertime, and overtime by employee.', 'route' => 'admin.attendance.report.index', 'can' => ['attendance.view']],
             ['label' => 'Leave Reports', 'description' => 'Leave usage and balances by employee and leave type.', 'route' => 'admin.leave.report.index', 'can' => ['leave.view']],
             ['label' => 'Payroll Reports', 'description' => 'Payroll cost, deductions, and contributions by period.', 'route' => 'admin.reports.payroll.index', 'can' => ['payroll.view']],
+            ['label' => 'Recruitment Reports', 'description' => 'Application pipeline funnel and requisition status.', 'route' => 'admin.reports.recruitment.index', 'can' => ['recruitment.view']],
+            ['label' => 'Performance Reports', 'description' => 'Average ratings and goal completion by cycle.', 'route' => 'admin.reports.performance.index', 'can' => ['performance.view']],
+            ['label' => 'Training Reports', 'description' => 'Enrollment, completion, and certificate status.', 'route' => 'admin.reports.training.index', 'can' => ['training.view']],
             ['label' => 'Analytics', 'description' => 'Cross-module workforce metrics at a glance.'],
         ] as $report)
             <div class="col-md-6 col-xl-4">

@@ -316,13 +316,21 @@ file is a summary, not a substitute) before extending any area further.
   turned out to be. With §54's own list now fully built, this is the
   session's own continuation past it — numbered Phase 19 to keep the
   same phase-lettering convention (19a, 19b, ...) every other
-  multi-slice phase used rather than leaving it unlabeled. Two slices
+  multi-slice phase used rather than leaving it unlabeled. Three slices
   done: (19a) a Reports landing page and an HR Report (headcount by
   department/employment type/status), gated by the long-reserved
   `reports.view` permission nothing had checked until now; (19b) a
   Payroll Report (cost/deduction/contribution/tax totals per period),
   gated by `payroll.view` instead — payroll data gets the module's own
-  tighter permission rather than `reports.view`, unlike HR's report.
+  tighter permission rather than `reports.view`, unlike HR's report;
+  (19c) Recruitment (application-status funnel), Performance (average
+  rating/goal completion per cycle), and Training (enrollment/
+  completion/certificate) Reports, each likewise gated by its own
+  module's `.view` permission, reachable only from the Reports landing
+  page since blueprint's own admin nav sketch never gives them a
+  sidebar row of their own. A real cross-controller bug (19b's and
+  19c's period/cycle pickers both non-deterministic on a tied
+  `start_date`) was caught and fixed in 19c — see Reports below for how.
   See Reports
   below.
 
@@ -2993,6 +3001,81 @@ period `<select>`'s auto-submit correctly switched periods (`Promise
 .all([waitForNavigation(), selectOption(...)])`, the same fix 17b
 established), and the period-detail link resolved to the real period.
 No console errors.
+
+**19c — Recruitment, Performance, and Training Reports.** Three more of
+blueprint §3's eight (items 57-59). Blueprint's own admin nav sketch
+(quoted at the top of this section) scaffolds only five REPORTS slots —
+no Recruitment/Performance/Training row of its own, even though §3's
+numbered list names all eight — so these three are real, fully-built
+pages reachable only from the Reports landing page's card grid, not new
+sidebar rows: the same "built, but not every built page gets its own
+sidebar entry" precedent Interviews/Assessments (14c) and Career/
+Succession (15g) already established, applied here to a whole report
+rather than a per-employee tab. Each reuses its own module's `.view`
+permission (`recruitment.view`/`performance.view`/`training.view`), the
+same "reports.view is the fallback, not the rule" reasoning 19b's
+Payroll Report established.
+
+**`Admin\RecruitmentReportController`** shows an application-status
+funnel (`ApplicationStatus::cases()` in pipeline order with zero-count
+stages included, not sorted by frequency — a funnel reads correctly
+only in process order) and a requisition-status breakdown, both
+company-filterable, plus open-postings and hired counts.
+`ApplicationStatus` already has a `label()` method (it was written with
+one from Phase 14b), so the view calls `$row['status']->label()`
+directly rather than the raw-value `ucwords(str_replace(...))` transform
+19a/19b use for enums that don't — checked per-enum before writing the
+view rather than assumed, since this app now has enums on both sides of
+that line (see 19a's own note on `EmploymentType`/`EmploymentStatus`
+lacking one).
+
+**`Admin\PerformanceReportController`** picks one `PerformanceCycle`
+(same "default to most recent, company-filterable" shape as 19b's
+period picker) and reports its review count/average rating (rated
+reviews only — a submitted-but-unrated review can't exist per 15b's own
+`submit()` guard, but a `Draft` one still can), reviews by type, and
+goal completion rate, plus a recent-cycles average-rating trend.
+
+**`Admin\TrainingReportController`** aggregates across *all* enrollments
+for the company rather than picking one session/course the way Payroll/
+Performance pick a period/cycle — training has no single "current
+period" spanning every course's sessions the way `PayrollPeriod`/
+`PerformanceCycle` do, so a company-wide snapshot (19a's HR Report
+shape) fits better here. Reports enrollment counts by status, an
+overall completion rate, certificates issued, and certificates expiring
+within 30 days — the same threshold `SendTrainingCertificateExpiration
+Reminders` (18a) already uses for its first reminder, reused here for
+consistency rather than picking a different window.
+
+**A real bug, caught only by browser verification against real
+(non-`RefreshDatabase`) data, not by the tests above.** Both
+`PayrollReportController` and `PerformanceReportController` picked their
+default period/cycle via `orderByDesc('start_date')->first()` alone; two
+periods or cycles sharing the exact same `start_date` (a real
+possibility — nothing prevents it, and the dev database already had two
+`PerformanceCycle`s dated `2026-01-01`) made that pick genuinely
+non-deterministic. `PerformanceReportTest`'s own fixtures always used
+distinct dates, so nothing in the test suite could have caught this —
+it only surfaced when Playwright loaded the real page against real data
+and the freshly-seeded verification cycle wasn't the one selected.
+Fixed by adding `orderByDesc('id')` as a tie-breaker on both controllers
+(most-recent-by-date, then most-recently-created) and pinning it down
+with a same-`start_date` regression test on each
+(`test_payroll_report_breaks_a_tied_start_date_by_the_newest_period`/
+`..._cycle`) rather than trusting the fix without one.
+
+**Verified with Playwright against real seeded data** across all three
+new pages plus the landing page's now-eight-card grid, logged in as a
+throwaway account granted `recruitment.view`/`performance.view`/
+`training.view`/`reports.view` directly (not through a seeded role): the
+Recruitment funnel and requisition counts, Performance's review/goal
+figures (re-verified correct immediately after the tie-break fix, not
+just the fix compiling), and Training's completion rate/certificate
+counts all matched hand-computed expectations against the seeded
+fixtures, and the landing page correctly showed "Coming soon" for
+Attendance/Leave/Payroll (this account genuinely lacks those three
+permissions) alongside real links for the other four. No console
+errors.
 
 ## Commands
 
