@@ -316,10 +316,14 @@ file is a summary, not a substitute) before extending any area further.
   turned out to be. With §54's own list now fully built, this is the
   session's own continuation past it — numbered Phase 19 to keep the
   same phase-lettering convention (19a, 19b, ...) every other
-  multi-slice phase used rather than leaving it unlabeled. First slice
-  (19a) done: a Reports landing page and an HR Report (headcount by
-  department/employment type/status), both gated by the long-reserved
-  `reports.view` permission nothing had checked until now. See Reports
+  multi-slice phase used rather than leaving it unlabeled. Two slices
+  done: (19a) a Reports landing page and an HR Report (headcount by
+  department/employment type/status), gated by the long-reserved
+  `reports.view` permission nothing had checked until now; (19b) a
+  Payroll Report (cost/deduction/contribution/tax totals per period),
+  gated by `payroll.view` instead — payroll data gets the module's own
+  tighter permission rather than `reports.view`, unlike HR's report.
+  See Reports
   below.
 
 ## Authentication
@@ -2935,6 +2939,60 @@ against a page with multiple "View" links didn't reliably land on the
 intended card, fixed by asserting on each link's actual `href` and
 navigating directly instead of clicking, a scripting fix, not an app
 one.
+
+**19b — Payroll Report.** `Admin\PayrollReportController`
+(`admin.reports.payroll.index`) picks one `PayrollPeriod` (defaulting to
+the most recent by `start_date`, company-filterable, any status —
+Draft/ForReview data is shown same as Finalized, just like
+`PayrollPeriodController`'s own index already does, since immutability
+is about not overwriting Finalized data, not about hiding earlier-stage
+data from `payroll.view` holders) and aggregates its `PayrollItem`s:
+total gross earnings/deductions/tax/net pay, deductions grouped by
+`PayrollItemLine.category`, government contributions grouped by agency
+(employee and employer shares separately, matching how the admin period
+detail page already shows both, unlike the payslip PDF which
+deliberately only shows the employee share), plus a small recent-periods
+table for a cross-period trend. No new tables, same "query existing
+data" restraint as 19a. A "View period detail" link hands off to the
+existing `PayrollPeriodController::show()` for the per-employee list
+rather than duplicating it here.
+
+**Gated by `payroll.view`, not `reports.view`** — the one deliberate
+departure from 19a's HR Report precedent. `reports.view` is also held
+by HR Administrator, who has no seeded access to any `payroll.*`
+permission; gating aggregate payroll cost/deduction/contribution/tax
+figures behind `reports.view` alone would hand that data to a role this
+app otherwise keeps it from everywhere else (payslip ownership checks,
+`employees.salary.view` gating on COE). Reuses the module's own
+permission instead, the same choice `AttendanceReportController`/
+`LeaveReportController` (Phases 8/9) already made for their own reports
+— `reports.view` turns out to mean "can reach the Reports area and see
+reports whose data has no more specific existing gate," not "can see
+every report."
+
+**Deduction category display reuses the same inline transform as
+19a** (`ucwords(str_replace('_', ' ', $category))`) — `PayrollItemLine
+.category` is free text set by `PayrollCalculationService`
+(`'basic_salary'`, a `CompensationItemType` value, or an adjustment's
+own category), the same raw-snake-case shape `EmploymentType`/
+`EmploymentStatus` already had in 19a, so the fix applies for the same
+reason. Caught by browser verification, not by the tests below (which
+asserted on the raw grouped value, not the rendered label) — a real
+instance of this project's own established lesson that Playwright
+passes the tests don't reach, worth a second look here specifically
+because a plain `assertViewHas()` on a controller's returned data can't
+catch a view-layer formatting gap the way actually rendering the page
+can.
+
+**Verified with Playwright against real seeded payroll data** (two
+periods, two employees each, contributions and deductions on every
+item), logged in as a throwaway Payroll Administrator account: the
+report defaulted to the more recent period, all four top-line totals
+and both breakdown tables matched hand-computed sums exactly, the
+period `<select>`'s auto-submit correctly switched periods (`Promise
+.all([waitForNavigation(), selectOption(...)])`, the same fix 17b
+established), and the period-detail link resolved to the real period.
+No console errors.
 
 ## Commands
 

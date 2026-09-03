@@ -15,7 +15,7 @@
             ['label' => 'HR Reports', 'description' => 'Headcount by department, employment type, and status.', 'route' => 'admin.reports.hr.index', 'can' => ['reports.view']],
             ['label' => 'Attendance Reports', 'description' => 'Presence, lateness, undertime, and overtime by employee.', 'route' => 'admin.attendance.report.index', 'can' => ['attendance.view']],
             ['label' => 'Leave Reports', 'description' => 'Leave usage and balances by employee and leave type.', 'route' => 'admin.leave.report.index', 'can' => ['leave.view']],
-            ['label' => 'Payroll Reports', 'description' => 'Payroll cost, deductions, and contributions by period.'],
+            ['label' => 'Payroll Reports', 'description' => 'Payroll cost, deductions, and contributions by period.', 'route' => 'admin.reports.payroll.index', 'can' => ['payroll.view']],
             ['label' => 'Analytics', 'description' => 'Cross-module workforce metrics at a glance.'],
         ] as $report)
             <div class="col-md-6 col-xl-4">

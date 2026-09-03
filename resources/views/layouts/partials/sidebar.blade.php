@@ -5,9 +5,9 @@
     Shifts/Overtime/Holidays/Leave, PAYROLL > Compensation/Benefits,
     TALENT > Recruitment/Applicants/Onboarding/Performance/Training/
     Skills, REPORTS > Overview/HR Reports/Attendance Reports/Leave
-    Reports, and ADMINISTRATION > Users/Roles/Permissions are real and
-    permission-gated; the rest light up the same way as their phase
-    lands.
+    Reports/Payroll Reports, and ADMINISTRATION > Users/Roles/
+    Permissions are real and permission-gated; the rest light up the
+    same way as their phase lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -121,7 +121,7 @@
                 'HR Reports' => ['route' => 'admin.reports.hr.index', 'can' => ['reports.view']],
                 'Attendance Reports' => ['route' => 'admin.attendance.report.index', 'can' => ['attendance.view']],
                 'Leave Reports' => ['route' => 'admin.leave.report.index', 'can' => ['leave.view']],
-                'Payroll Reports' => null,
+                'Payroll Reports' => ['route' => 'admin.reports.payroll.index', 'can' => ['payroll.view']],
                 'Analytics' => null,
             ],
             'ADMINISTRATION' => [
