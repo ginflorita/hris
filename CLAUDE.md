@@ -283,18 +283,21 @@ non-negotiable — don't relax these for convenience):
   **Scheduler** (Laravel's scheduler wired up for the first time in
   this app; `leave:accrue`/`leave:carry-over` close the Leave accrual
   gap Phase 9 documented, `training:send-certificate-expiration-
-  reminders` closes the Training gap Phase 15f documented) and **real
+  reminders` closes the Training gap Phase 15f documented), **real
   queued notifications** (`SecurityAlert`/`PayslipPublished`/
   `TrainingCertificateExpiring` now implement `ShouldQueue`, verified
   genuinely queued against the real `database` queue connection, not
-  just interface-compliant). See Production, Backup & Disaster
-  Recovery below.
+  just interface-compliant), and **encrypted backup + restore
+  testing** (`backup:run`/`backup:restore`/`backup:verify-latest`,
+  covering database + private files + `.env`, checksum-verified,
+  restore ground-truthed against real application data end to end).
+  See Production, Backup & Disaster Recovery below.
 
-**Not started:** the remainder of Phase 18 — backup/restore, production
-deployment config (including the queue worker process itself), CI/CD,
-and disaster recovery documentation. Follow the phase order in
-blueprint §54/§59; don't jump ahead to a later phase's tables/UI before
-its dependencies exist. Re-read the relevant blueprint section before
+**Not started:** the remainder of Phase 18 — production deployment
+config (Nginx/PHP-FPM, the queue worker process itself), CI/CD, and
+disaster recovery documentation. Follow the phase order in blueprint
+§54/§59; don't jump ahead to a later phase's tables/UI before its
+dependencies exist. Re-read the relevant blueprint section before
 starting a phase — this file is a summary, not a substitute.
 
 ## Authentication
@@ -2622,6 +2625,92 @@ a deployment -- the same restraint this app already applies to
 overtime/holiday pay rates and `PerPayPeriod` accrual (18a). A natural
 candidate whenever a future phase actually needs payroll processing to
 survive a request timeout on a very large company, not before.
+
+**18c — Backup, encryption, and restore testing.** Blueprint §51
+17.22 states the principle this whole slice is built around: "A backup
+that has never been restored is not a proven backup." Three new
+commands, deliberately hand-built rather than a third-party backup
+package (blueprint's actual ask -- three payloads, encrypted,
+checksummed, restorable -- is narrow enough to stay legible end to end
+as plain code, the same "collapse to what's real" judgment this app
+has made everywhere else rather than reaching for a heavier dependency
+by default):
+
+- **`backup:run`** writes three independently encrypted payloads --
+  the database (raw SQLite file bytes, or a `mysqldump` for MySQL,
+  shelled out via Laravel's `Process` facade), a zip of
+  `storage/app/private/` (every employee document and applicant resume
+  currently on disk), and `.env` itself (blueprint's "Configuration
+  Backup," the one payload that's actively dangerous to leave
+  unencrypted since it holds `APP_KEY` and database credentials) --
+  plus a `manifest.json` recording each payload's SHA-256 checksum.
+  Encryption is Laravel's own `Crypt` facade (AES-256-CBC with a MAC,
+  keyed by `APP_KEY`) applied per-payload, not a separate backup-
+  specific key: whoever can decrypt a backup already needs equivalent
+  access to the app's own environment, so a second secret to manage
+  would add complexity without a real security boundary behind it.
+- **`backup:restore {backup-dir} {output-dir}`** decrypts each payload
+  and verifies its checksum against the manifest before writing
+  anything out, failing cleanly (not a raw stack trace) if a payload
+  was corrupted or tampered with. Deliberately does **not** swap the
+  restored files into the live database path or `storage/app/private/`
+  itself -- doing that safely needs the application stopped first (a
+  live SQLite file can't be safely overwritten out from under an open
+  connection; MySQL needs an actual maintenance window), which is a
+  deployment *procedure* decision belonging in 18d's disaster-recovery
+  runbook, not something an automated command should silently do. This
+  command's job ends at "here is the verified, decrypted, restorable
+  content."
+- **`backup:verify-latest`** is blueprint §47's own "Backup
+  verification" scheduler bullet, built as real automation rather than
+  a one-time manual check: finds the most recent `backup:run` output,
+  restores it into a throwaway scratch directory (relying on
+  `backup:restore`'s own checksum verification to catch corruption),
+  and deletes the scratch copy either way -- its job is proving the
+  backup restores cleanly, not producing a usable copy. Scheduled 30
+  minutes after `backup:run` itself, so it always checks the backup
+  that was *just* taken.
+
+**Ground-truthed against real application data, not just the test
+fixtures.** Before writing the formal test suite, `backup:run` was run
+against this sandbox's actual dev database and `storage/app/private/`
+contents, then `backup:restore`'d into a scratch directory: the
+restored SQLite file's SHA-256 checksum matched the live database file
+*exactly*, and querying the restored copy directly via PDO returned
+real, correct data. One apparent discrepancy surfaced during this
+check -- a raw `SELECT COUNT(*) FROM employees` against the restored
+file returned more rows than `Employee::count()` against the live
+app -- and rather than assuming either a backup bug or writing it off,
+it was traced to its actual cause: `Employee` uses `SoftDeletes`,
+so Eloquent's `count()` silently excludes soft-deleted rows that a raw
+SQL count does not. Confirmed by re-running both counts with an
+explicit `WHERE deleted_at IS NULL`, which matched exactly -- a
+verification-methodology gap on the first check, not a real defect,
+the same "confirm before concluding" discipline this project has
+applied to every surprising result all session.
+
+**Testing needed real file fixtures, not the app's own default paths**
+-- `phpunit.xml` runs the whole suite against an in-memory
+(`:memory:`) SQLite connection specifically for speed, which has no
+file on disk to back up at all. Rather than slow down the whole suite
+by switching its default connection, `backup:run`/`backup:verify-latest`
+gained `--database-path`/`--source-dir`/`--env-path`/`--backups-root`
+overrides (defaulting to the real paths when omitted) so
+`BackupRestoreTest` can exercise the real file-based logic path
+against temporary fixtures without touching either the shared test
+database or this app's real dev files. 11 new tests across
+`tests/Feature/Console/BackupRestoreTest.php`, all passing on the first
+run once the override options existed.
+
+**Deliberately not built**: backup retention/pruning (old backups
+under `storage/app/backups/` accumulate indefinitely -- a real
+deployment would want a "keep last N days" policy, not built
+speculatively here without a concrete retention requirement to build
+against) and streaming encryption for very large databases
+(`Crypt::encryptString()` holds the whole payload in memory; a
+genuinely large production database would need to pipe `mysqldump`
+through something like `openssl enc` instead). Both are real, sized
+follow-ups, not silent gaps.
 
 ## Commands
 

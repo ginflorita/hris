@@ -14,3 +14,9 @@ Artisan::command('inspire', function () {
 Schedule::command('leave:accrue')->dailyAt('01:00');
 Schedule::command('leave:carry-over')->yearlyOn(1, 1, '01:30');
 Schedule::command('training:send-certificate-expiration-reminders')->dailyAt('07:00');
+
+// Blueprint §51 17.22 / §47: nightly backup, then prove it actually
+// restores rather than trusting it -- run back-to-back so verification
+// always checks the backup that was *just* taken, not a stale one.
+Schedule::command('backup:run')->dailyAt('02:00');
+Schedule::command('backup:verify-latest')->dailyAt('02:30');
