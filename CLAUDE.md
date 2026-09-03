@@ -254,7 +254,7 @@ non-negotiable — don't relax these for convenience):
   and the rest (final payroll, COE, separation) left as documented,
   deliberate gaps. See Benefits and Offboarding below.
 
-- Phase 17 (partial) — Security Hardening & OWASP Verification:
+- Phase 17 (complete) — Security Hardening & OWASP Verification:
   **Security headers** (a new `SecurityHeaders` middleware setting CSP/
   X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-
   Policy/conditional HSTS on every response, deliberately tuned — not
@@ -263,17 +263,27 @@ non-negotiable — don't relax these for convenience):
   wired at eight sensitive mutation points named by blueprint §51
   17.24 — user creation/role changes/disable-enable, role permission
   changes, salary changes, payroll finalization — gated by the
-  long-reserved `audit-logs.view` permission), and a **Broken Access
+  long-reserved `audit-logs.view` permission), a **Broken Access
   Control / IDOR test suite** (`BrokenAccessControlTest`, one file
   walking blueprint §51 17.4/17.5's named scenarios end to end; every
-  assertion passed on the first run — confirmation, not a fix). See
-  Security Hardening below.
+  assertion passed on the first run — confirmation, not a fix), and
+  **input/file/CSRF verification plus closing documentation**
+  (zero raw SQL and one, trusted, non-user-input raw Blade echo found
+  repo-wide; file upload MIME/size validation confirmed by new
+  regression tests; every POST form confirmed to carry `@csrf`;
+  `composer audit`/`npm audit` both clean; an OWASP Top 10:2025
+  verification matrix, representative ASVS 5.0 entries, and a final
+  security checklist all written into this file). See Security
+  Hardening below for what's genuinely done versus deliberately left
+  to Phase 18 or a real deployment's own review (infrastructure
+  hardening, CI/CD, monitoring integration, penetration testing,
+  vulnerability scanning).
 
-**Not started:** the remainder of Phase 17, then Phase 18 (Production,
-Backup & Disaster Recovery). Follow the phase order in blueprint
-§54/§59; don't jump ahead to a later phase's tables/UI before its
-dependencies exist. Re-read the relevant blueprint section before
-starting a phase — this file is a summary, not a substitute.
+**Not started:** Phase 18 (Production, Backup & Disaster Recovery).
+Follow the phase order in blueprint §54/§59; don't jump ahead to a
+later phase's tables/UI before its dependencies exist. Re-read the
+relevant blueprint section before starting a phase — this file is a
+summary, not a substitute.
 
 ## Authentication
 
@@ -2288,6 +2298,181 @@ recording precisely because a security-hardening phase finding nothing
 to fix is itself the expected, successful outcome of CLAUDE.md's
 "security is built continuously" principle, not a sign the phase did
 nothing.
+
+**17d — Input/file/CSRF verification, dependency audit, and final
+documentation, closing Phase 17.** Blueprint §51 17.6/17.7/17.9/17.10/
+17.11 named several more angles to check:
+
+- **SQL injection (17.11)**: a repo-wide grep for `DB::raw`/`whereRaw`/
+  `orderByRaw`/`selectRaw`/`havingRaw` and any request-driven `orderBy()`
+  found zero matches — every query in the app goes through Eloquent's
+  parameterized builder, so 17.11's specific worry ("dynamic SQL
+  identifiers such as sorting fields — use allow-lists") doesn't apply:
+  there's no raw fragment built from input anywhere to allow-list in
+  the first place.
+- **XSS (17.10)**: a repo-wide grep for Blade's raw-echo `{!! !!}`
+  found exactly one use (`security/index.blade.php`'s 2FA QR code SVG,
+  server-generated, not user input); every other output goes through
+  `{{ }}`'s automatic escaping. `InputSecurityTest::test_a_note_
+  containing_a_script_tag_is_rendered_escaped_not_executed()` pins this
+  down against a real free-text field (an Employee Note, standing in
+  for blueprint's "Comments"/"Notes" examples) rather than trusting the
+  grep alone.
+- **File upload (17.7)**: both upload paths already had solid
+  validation from the phases that built them (`EmployeeDocumentController`:
+  `mimes:pdf,jpg,jpeg,png,doc,docx`, `max:10240`; `ApplicantController`:
+  `mimes:pdf,doc,docx`, `max:10240`), private `local` disk storage, and
+  Laravel's default random storage filename (`UploadedFile::store()`,
+  never `storeAs()` with a user-supplied name) — nothing to fix, but now
+  pinned down by three new regression tests (rejects a disallowed type,
+  rejects an oversized file, accepts a valid one) instead of resting on
+  the validation rule alone.
+- **CSRF (17.9)**: Laravel's `ValidateCsrfToken` ships in the `web`
+  middleware group by default and `bootstrap/app.php` never excludes
+  any route from it. A PHPUnit test asserting CSRF rejection would only
+  prove something about the test environment, not this app — Laravel's
+  own middleware short-circuits the check whenever
+  `app()->runningUnitTests()` is true, specifically so feature tests
+  don't need to thread a token through every `POST`, which is exactly
+  why this whole suite's `$this->post(...)` calls have never needed
+  one. What *is* this app's own responsibility, and was checked: every
+  `method="POST"` Blade form actually carries `@csrf` — a repo-wide
+  per-file count comparison (103 non-GET method-spoofed forms, 159
+  POST forms total) found none missing it.
+- **Dependency security (17.20)**: `composer audit` and `npm audit`
+  both report zero vulnerabilities as of this slice.
+
+**Production configuration (17.19) is a deployment-time concern, not
+a codebase one, and is left to Phase 18 rather than faked here** —
+`.env.example`'s `APP_DEBUG=true` is correct for its actual purpose (a
+local-dev template; CLAUDE.md's own Stack section already documents
+local/sandbox dev falling back to SQLite, the same "local needs
+different defaults than production" reasoning), and there is no
+mechanism in application code that could force `APP_DEBUG=false` in a
+real deployment — that's an environment variable a deployer sets, which
+is exactly Phase 18's "Production deployment" bullet.
+
+**OWASP Top 10:2025 Verification Matrix** (blueprint §51 17.25):
+
+| OWASP | Control | Verified by |
+|---|---|---|
+| A01 Broken Access Control | RBAC + data scope (Own/Team enforced), object-level ownership checks on payslips/documents/leave/COE | `BrokenAccessControlTest`, `DataScopeTest`, `PayslipPortalTest` |
+| A02 Security Misconfiguration | `SecurityHeaders` middleware; `APP_DEBUG=false` required in production (deploy-time, Phase 18) | `SecurityHeadersTest` |
+| A03 Software Supply Chain Failures | `composer audit` / `npm audit`, both clean | 17d (manual run) |
+| A04 Cryptographic Failures | bcrypt password hashing, encrypted 2FA secrets, private document/payslip storage | Phase 3 auth test suite |
+| A05 Injection | Eloquent-only queries (zero raw SQL), Blade auto-escaping (one trusted, non-user-input exception) | 17d grep audit, `InputSecurityTest` |
+| A06 Insecure Design | Payroll's maker-checker-shaped lifecycle (process → review → approve → finalize → lock → publish); permission catalog reserved ahead of each module | `PayrollLifecycleTest` |
+| A07 Authentication Failures | Fortify MFA/throttling/generic errors; mandatory MFA for Superadmin; session invalidation | `Auth\*Test` suite, `SuperadminMfaTest` |
+| A08 Software or Data Integrity Failures | Payroll immutable once `Finalized`; append-only `Employment`/`BenefitEnrollment`; generic audit log | `PayrollLifecycleTest`, `AuditLoggingTest` |
+| A09 Security Logging & Alerting Failures | `login_logs`, `payslip_access_logs`, `audit_logs`, `SecurityAlert` notifications | `AuditLoggingTest`, `PayslipPortalTest` |
+| A10 Mishandling of Exceptional Conditions | `DB::transaction()` around every multi-step write (Employment close+create, `LeaveBalanceService`, payroll processing); Laravel's default production error pages | transactional assertions throughout the Admin/Portal suites |
+
+**OWASP ASVS 5.0** (blueprint §52) — a representative sample in
+blueprint's own Requirement/HRIS/Test/Expected/Result shape, not an
+exhaustive line-by-line pass against ASVS's full requirement list
+(hundreds of items; blueprint's own body gives one worked example, not
+a template implying full enumeration):
+
+```
+ASVS: Authentication -- Password Storage
+HRIS: Passwords are hashed with bcrypt (Hash::make), never plaintext.
+Test: Inspect users.password after registration/reset.
+Expected: Bcrypt hash.
+Result: PASS
+
+ASVS: Authorization -- Object-Level Access
+HRIS: An employee can only access their own payslip.
+Test: Portal payslip show/download against another employee's payroll_item id.
+Expected: 404.
+Result: PASS (PayslipPortalTest, BrokenAccessControlTest)
+
+ASVS: Session Management -- Session Invalidation
+HRIS: Forcing logout on another session actually revokes its access.
+Test: Force logout a second session, then reuse its session cookie.
+Expected: Access denied, redirected to login.
+Result: PASS (SessionManagementTest)
+
+ASVS: Input Validation -- File Upload
+HRIS: Document upload rejects disallowed MIME types and oversized files.
+Test: Upload a .php file; upload a file over the 10MB limit.
+Expected: Validation error, nothing stored.
+Result: PASS (InputSecurityTest)
+
+ASVS: Access Control -- Data Scope
+HRIS: A Manager can only act on their direct reports' requests.
+Test: Manager attempts to approve a non-report's leave request.
+Expected: 403.
+Result: PASS (DataScopeTest)
+```
+
+**Phase 17 Final Security Checklist** (blueprint §53) — checked
+against what this codebase actually contains, not aspirationally:
+
+Authentication: password hashing, MFA, password reset, login
+throttling, brute-force protection, session security, account
+lock/disable, and re-authentication for sensitive actions are all done
+(Phase 3/4).
+
+Authorization: RBAC, permissions, policies, and data-level authorization
+are done; Manager (Team) and Employee (Own) scope are enforced (Phase
+13e). Department/Branch/Company/All scope columns exist but enforcement
+is deliberately unbuilt — no seeded role exercises them, and CLAUDE.md's
+own Authorization section already documents this as a "don't build for
+scopes nothing uses" restraint, not an oversight.
+
+Application: CSRF, XSS, SQL injection, input validation, output
+encoding, file security, and secure error handling are all done and
+verified this phase. Path traversal: not independently tested, but
+structurally unreachable — every file operation goes through Laravel's
+`Storage` facade and `UploadedFile::store()`'s own generated paths,
+never a user-supplied path segment.
+
+Data: encryption (password hashes, encrypted 2FA secrets), sensitive
+data protection (salary gated by `employees.salary.view`, payslips by
+ownership), private file storage, payroll snapshots, and historical
+records (effective-dated, never overwritten) are all done.
+
+Infrastructure: security headers are done (17a). HTTPS/firewall/secure
+server/database restrictions/secrets management/production
+configuration are deployment-environment concerns Phase 18 ("Production
+deployment," "HTTPS," "Nginx/PHP-FPM") owns — nothing here for an
+application codebase to build ahead of an actual target server.
+
+Monitoring: audit logs (17b), security-event emails, login logs, and
+data access logs are all done. Broader alerting/error-monitoring
+integration (e.g. a Sentry-style service) is a Phase 18 concern — this
+codebase logs to its own tables/notifications, not to external
+monitoring infrastructure that doesn't exist yet.
+
+Supply chain: `composer audit`/`npm audit` are clean as of this
+session; dependency updates and package review are an ongoing
+maintenance practice rather than a one-time checkbox. CI/CD security has
+no pipeline to secure yet — also Phase 18.
+
+OWASP: Top 10:2025 and ASVS 5.0 verification are both done above.
+Authentication/Session/Authorization/File Upload/Logging/Secure Headers
+guidance are all reflected in the controls already cited throughout
+this file.
+
+Testing: unit/feature/authorization/payroll-calculation/integration/
+security tests are all done (387 tests as of this slice, including the
+five new `Tests\Feature\Security\*` files this phase added). Penetration
+testing and automated vulnerability scanning are **not done and can't
+honestly be claimed done from inside a coding session** — both need a
+live deployed target and tooling/expertise outside this codebase; `composer
+audit`/`npm audit` are the automated-dependency-scanning slice of this
+that a codebase-level check *can* do, and that was done. Backup
+restoration testing is Phase 18's "Restore testing" bullet, which needs
+an actual backup/restore pipeline to exist first.
+
+Phase 17 (Security Hardening & OWASP Verification) is complete for
+everything a coding session can build and verify: security headers
+(17a), a generic audit log (17b), a broken-access-control/IDOR test
+suite (17c), and input/file/CSRF verification plus this closing
+documentation (17d). What remains — infrastructure hardening, CI/CD,
+monitoring integration, and third-party penetration testing/vulnerability
+scanning — is Phase 18's job or a real deployment's own security review,
+not a gap in this phase's own scope.
 
 ## Commands
 
