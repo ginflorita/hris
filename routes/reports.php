@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\HrReportController;
 use App\Http\Controllers\Admin\PayrollReportController;
 use App\Http\Controllers\Admin\PerformanceReportController;
@@ -16,4 +17,5 @@ Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
         Route::get('recruitment', [RecruitmentReportController::class, 'index'])->name('recruitment.index');
         Route::get('performance', [PerformanceReportController::class, 'index'])->name('performance.index');
         Route::get('training', [TrainingReportController::class, 'index'])->name('training.index');
+        Route::get('analytics', [AnalyticsReportController::class, 'index'])->name('analytics.index');
     });

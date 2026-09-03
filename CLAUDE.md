@@ -304,7 +304,7 @@ follow-up, not a silent omission; there is no separate "not started"
 phase left to point to. Re-read the relevant phase section above (this
 file is a summary, not a substitute) before extending any area further.
 
-- Phase 19 (in progress) — Reports & Analytics: blueprint §3 names eight
+- Phase 19 (complete) — Reports & Analytics: blueprint §3 names eight
   report/analytics modules (items 53-60: HR, Payroll, Attendance, Leave,
   Recruitment, Performance, Training Reports, plus Workforce Analytics)
   and §55's own "V1 MVP" list names Reports as item 19 of 21 — but
@@ -313,26 +313,27 @@ file is a summary, not a substitute) before extending any area further.
   "Workflow Engine" also has none) and never assigns it to one of §54's
   Phase 1-18 despite listing it as V1-scoped, the same "named but never
   scheduled" gap Career Development/Succession Planning (Phase 15g)
-  turned out to be. With §54's own list now fully built, this is the
-  session's own continuation past it — numbered Phase 19 to keep the
-  same phase-lettering convention (19a, 19b, ...) every other
-  multi-slice phase used rather than leaving it unlabeled. Three slices
-  done: (19a) a Reports landing page and an HR Report (headcount by
-  department/employment type/status), gated by the long-reserved
-  `reports.view` permission nothing had checked until now; (19b) a
-  Payroll Report (cost/deduction/contribution/tax totals per period),
-  gated by `payroll.view` instead — payroll data gets the module's own
-  tighter permission rather than `reports.view`, unlike HR's report;
-  (19c) Recruitment (application-status funnel), Performance (average
-  rating/goal completion per cycle), and Training (enrollment/
-  completion/certificate) Reports, each likewise gated by its own
-  module's `.view` permission, reachable only from the Reports landing
-  page since blueprint's own admin nav sketch never gives them a
-  sidebar row of their own. A real cross-controller bug (19b's and
-  19c's period/cycle pickers both non-deterministic on a tied
-  `start_date`) was caught and fixed in 19c — see Reports below for how.
-  See Reports
-  below.
+  turned out to be. With §54's own list already fully built, this
+  became the session's own continuation past it — numbered Phase 19 to
+  keep the same phase-lettering convention (19a, 19b, ...) every other
+  multi-slice phase used rather than leaving it unlabeled. Four slices,
+  all eight report modules: (19a) a Reports landing page and an HR
+  Report (headcount by department/employment type/status), gated by the
+  long-reserved `reports.view` permission nothing had checked until
+  now; (19b) a Payroll Report (cost/deduction/contribution/tax totals
+  per period), gated by `payroll.view` instead — payroll data gets the
+  module's own tighter permission rather than `reports.view`, unlike
+  HR's report; (19c) Recruitment (application-status funnel),
+  Performance (average rating/goal completion per cycle), and Training
+  (enrollment/completion/certificate) Reports, each likewise gated by
+  its own module's `.view` permission, reachable only from the Reports
+  landing page since blueprint's own admin nav sketch never gives them
+  a sidebar row of their own; (19d) Workforce Analytics, a glance-level
+  page combining one top-line number from each other report, closing
+  out the sidebar's REPORTS section and the landing page's eight-card
+  grid. A real cross-controller bug (19b's and 19c's period/cycle
+  pickers both non-deterministic on a tied `start_date`) was caught and
+  fixed in 19c. See Reports below.
 
 ## Authentication
 
@@ -2849,7 +2850,7 @@ separate document, is the accounting of what's built versus what's a
 documented, deliberate gap — read the phase section for the area being
 touched before assuming either.
 
-## Reports (Phase 19, in progress)
+## Reports (Phase 19, complete)
 
 Blueprint §3 lists eight report/analytics modules (items 53-60: HR,
 Payroll, Attendance, Leave, Recruitment, Performance, Training Reports,
@@ -3076,6 +3077,70 @@ fixtures, and the landing page correctly showed "Coming soon" for
 Attendance/Leave/Payroll (this account genuinely lacks those three
 permissions) alongside real links for the other four. No console
 errors.
+
+**19d — Workforce Analytics, closing Phase 19.** Blueprint §3 item 60,
+and the fifth and last of the REPORTS slots blueprint's own admin nav
+sketch scaffolds — the one this whole section's sidebar/landing-page
+placeholder has been called "Analytics" since Phase 2. Deliberately a
+single glance-level page, not an eighth detailed report:
+`Admin\AnalyticsReportController` puts one top-line number from each of
+the other reports side by side (active employees, open postings,
+pending requisitions, pending leave requests, pending overtime
+requests, average performance rating, training completion rate) —
+Analytics' whole value is the side-by-side view, not a new breakdown,
+so it deliberately doesn't re-derive anything 19a-19c's controllers
+don't already compute in more detail.
+
+**No payroll cost tile, on purpose.** "Workforce" analytics stays
+headcount/people metrics — every number here is visible to anyone
+holding `reports.view` alone (the same permission this page is gated
+by, matching 19a's HR Report rather than 19b's `payroll.view`), and
+19b already established why aggregate payroll figures need the
+tighter gate `reports.view` alone doesn't provide. This page has no
+per-tile permission mechanism (unlike the landing page's per-card
+`Route::has()`/`can()` check), so adding one payroll-cost tile would
+mean either loosening every `reports.view` holder's access to payroll
+data or building a second gating mechanism this one page doesn't
+otherwise need — a real, sized follow-up if a future slice wants it,
+not silently deferred.
+
+**Sidebar REPORTS section is now fully real** — all five items
+(`Overview`, `HR Reports`, `Attendance Reports`, `Leave Reports`,
+`Payroll Reports`, plus this slice's `Analytics`) point at working
+pages, closing out the placeholder set Phase 2 first scaffolded. The
+landing page's card grid is now a genuine eight-card front door to
+every blueprint §3 report module (53-60), each card independently
+showing "View" or "Coming soon" per the viewer's own permissions.
+
+**Verified with Playwright against real seeded data**, logged in as a
+throwaway account granted only `reports.view` (no module-specific
+permission at all): the landing page correctly showed exactly two real
+links (HR Reports and Analytics, the only two cards gated by
+`reports.view` alone) against six "Coming soon" badges, the sidebar's
+Analytics entry was enabled with the correct href, and all seven tiles
+on the Analytics page matched hand-computed sums against seeded
+leave/overtime/requisition/posting/review/enrollment fixtures. No
+console errors.
+
+**Bug caught: none in the application this slice** — the one real bug
+this whole phase found (19b/19c's tied-`start_date` non-determinism)
+was already fixed in 19c; nothing new surfaced writing the aggregate
+queries here, likely because every query this slice needed was a
+simpler version of one 19a-19c had already exercised and gotten
+right.
+
+Blueprint §3's eight report/analytics modules (items 53-60: HR,
+Payroll, Attendance, Leave, Recruitment, Performance, Training
+Reports, Workforce Analytics) are now built end-to-end across
+19a-19d — the first phase this session added past blueprint §54's own
+Phase 1-18 list, closing the "named in §3/§55 but never scheduled" gap
+that started this phase. Every report reuses existing data with no new
+tables, and every permission choice (`reports.view` as the shared
+fallback; a module's own tighter `.view` permission — `attendance.view`/
+`leave.view`/`payroll.view`/`recruitment.view`/`performance.view`/
+`training.view` — wherever one already existed and the data was
+sensitive enough to warrant it) is documented above per-slice rather
+than applied as one blanket rule.
 
 ## Commands
 

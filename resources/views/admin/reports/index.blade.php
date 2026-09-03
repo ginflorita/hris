@@ -19,7 +19,7 @@
             ['label' => 'Recruitment Reports', 'description' => 'Application pipeline funnel and requisition status.', 'route' => 'admin.reports.recruitment.index', 'can' => ['recruitment.view']],
             ['label' => 'Performance Reports', 'description' => 'Average ratings and goal completion by cycle.', 'route' => 'admin.reports.performance.index', 'can' => ['performance.view']],
             ['label' => 'Training Reports', 'description' => 'Enrollment, completion, and certificate status.', 'route' => 'admin.reports.training.index', 'can' => ['training.view']],
-            ['label' => 'Analytics', 'description' => 'Cross-module workforce metrics at a glance.'],
+            ['label' => 'Analytics', 'description' => 'Cross-module workforce metrics at a glance.', 'route' => 'admin.reports.analytics.index', 'can' => ['reports.view']],
         ] as $report)
             <div class="col-md-6 col-xl-4">
                 <div class="card h-100">
