@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Security\Services\AuditLogger;
+use App\Enums\AuditAction;
 use App\Enums\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
@@ -34,7 +36,7 @@ class RoleController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('create', Role::class);
 
@@ -46,6 +48,12 @@ class RoleController extends Controller
             'data_scope' => $validated['data_scope'],
         ]);
         $role->syncPermissions($validated['permissions'] ?? []);
+
+        $auditLogger->log($request->user(), AuditAction::Created, 'Roles & Permissions', $role, null, [
+            'name' => $role->name,
+            'data_scope' => $validated['data_scope']->value,
+            'permissions' => implode(', ', $validated['permissions'] ?? []) ?: '(none)',
+        ]);
 
         return redirect()->route('admin.roles.index')->with('status', 'Role created.');
     }
@@ -65,14 +73,22 @@ class RoleController extends Controller
         ]);
     }
 
-    public function update(Request $request, Role $role): RedirectResponse
+    public function update(Request $request, Role $role, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('update', $role);
 
         $validated = $this->validateRole($request, $role);
 
+        $oldPermissions = $role->permissions()->pluck('name')->all();
+        $oldDataScope = $role->data_scope;
+
         $role->update(['name' => $validated['name'], 'data_scope' => $validated['data_scope']]);
         $role->syncPermissions($validated['permissions'] ?? []);
+
+        $auditLogger->log($request->user(), AuditAction::PermissionsChanged, 'Roles & Permissions', $role,
+            ['data_scope' => $oldDataScope->value, 'permissions' => implode(', ', $oldPermissions) ?: '(none)'],
+            ['data_scope' => $validated['data_scope']->value, 'permissions' => implode(', ', $validated['permissions'] ?? []) ?: '(none)'],
+        );
 
         return redirect()->route('admin.roles.index')->with('status', 'Role updated.');
     }

@@ -123,7 +123,7 @@
                 'Workflows' => null,
                 'Notifications' => null,
                 'Announcements' => null,
-                'Audit Logs' => null,
+                'Audit Logs' => ['route' => 'admin.audit-logs.index', 'can' => ['audit-logs.view']],
                 'Settings' => null,
             ],
         ] as $section => $items)

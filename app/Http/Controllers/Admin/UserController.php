@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Security\Services\AuditLogger;
+use App\Enums\AuditAction;
 use App\Enums\DefaultRole;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
@@ -43,7 +45,7 @@ class UserController extends Controller
         return view('admin.users.create', ['roles' => Role::orderBy('name')->get(), 'employees' => $this->linkableEmployees()]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('create', User::class);
 
@@ -65,6 +67,12 @@ class UserController extends Controller
         ]);
 
         $user->syncRoles($validated['roles'] ?? []);
+
+        $auditLogger->log($request->user(), AuditAction::Created, 'User Management', $user, null, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'roles' => implode(', ', $validated['roles'] ?? []) ?: '(none)',
+        ]);
 
         Password::sendResetLink(['email' => $user->email]);
 
@@ -100,7 +108,7 @@ class UserController extends Controller
         return back()->with('status', 'Profile updated.');
     }
 
-    public function updateRoles(Request $request, User $user): RedirectResponse
+    public function updateRoles(Request $request, User $user, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('assignRoles', $user);
 
@@ -109,6 +117,7 @@ class UserController extends Controller
             'roles.*' => ['string', 'exists:roles,name'],
         ]);
         $newRoles = $validated['roles'] ?? [];
+        $oldRoles = $user->getRoleNames()->all();
 
         $losingSuperadmin = $user->hasRole(DefaultRole::Superadmin->value)
             && ! in_array(DefaultRole::Superadmin->value, $newRoles, true);
@@ -122,24 +131,41 @@ class UserController extends Controller
 
         $user->syncRoles($newRoles);
 
+        $auditLogger->log($request->user(), AuditAction::RoleAssigned, 'User Management', $user,
+            ['roles' => implode(', ', $oldRoles) ?: '(none)'],
+            ['roles' => implode(', ', $newRoles) ?: '(none)'],
+        );
+
         return back()->with('status', 'Roles updated.');
     }
 
-    public function disable(User $user): RedirectResponse
+    public function disable(Request $request, User $user, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('disable', $user);
 
         $user->update(['disabled_at' => now()]);
         $this->destroyAllSessions($user);
 
+        $auditLogger->log($request->user(), AuditAction::Disabled, 'User Management', $user,
+            ['disabled_at' => '(active)'],
+            ['disabled_at' => $user->disabled_at->toDateTimeString()],
+        );
+
         return back()->with('status', 'User disabled.');
     }
 
-    public function enable(User $user): RedirectResponse
+    public function enable(Request $request, User $user, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('enable', $user);
 
+        $wasDisabledAt = $user->disabled_at?->toDateTimeString() ?? '(active)';
+
         $user->update(['disabled_at' => null]);
+
+        $auditLogger->log($request->user(), AuditAction::Enabled, 'User Management', $user,
+            ['disabled_at' => $wasDisabledAt],
+            ['disabled_at' => '(active)'],
+        );
 
         return back()->with('status', 'User enabled.');
     }

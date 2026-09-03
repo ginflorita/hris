@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Security\Services\AuditLogger;
+use App\Enums\AuditAction;
 use App\Enums\EmploymentChangeType;
 use App\Enums\EmploymentStatus;
 use App\Enums\EmploymentType;
@@ -22,7 +24,7 @@ class EmploymentController extends Controller
      * end_date to the day before the new row's effective_date. There is
      * no update()/destroy() — see CLAUDE.md "Employment" for why.
      */
-    public function store(Request $request, Employee $employee): RedirectResponse
+    public function store(Request $request, Employee $employee, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('employees.update');
 
@@ -57,14 +59,27 @@ class EmploymentController extends Controller
         $validated['company_id'] = $employee->company_id;
         $validated['created_by'] = $request->user()->id;
 
-        DB::transaction(function () use ($employee, $validated) {
+        DB::transaction(function () use ($employee, $validated, $request, $auditLogger) {
             $current = $employee->employments()->whereNull('end_date')->first();
+            $priorSalary = $current?->basic_salary;
 
             if ($current) {
                 $current->update(['end_date' => Carbon::parse($validated['effective_date'])->subDay()]);
             }
 
             $employee->employments()->create($validated);
+
+            // Employment itself is already the append-only source of truth
+            // for salary history (see CLAUDE.md "Employment") — this is a
+            // secondary entry in the cross-module security audit trail
+            // blueprint §51 17.24 calls for, not a second history mechanism.
+            if (array_key_exists('basic_salary', $validated) && $validated['basic_salary'] !== null
+                && (float) $validated['basic_salary'] !== (float) ($priorSalary ?? 0)) {
+                $auditLogger->log($request->user(), AuditAction::Updated, 'Employee Compensation', $employee,
+                    ['basic_salary' => $priorSalary !== null ? number_format((float) $priorSalary, 2) : '(none)'],
+                    ['basic_salary' => number_format((float) $validated['basic_salary'], 2)],
+                );
+            }
         });
 
         return back()->with('status', 'Employment record added.');

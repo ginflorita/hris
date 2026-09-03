@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Payroll\Services\PayrollCalculationService;
+use App\Domain\Security\Services\AuditLogger;
+use App\Enums\AuditAction;
 use App\Enums\PayrollPeriodStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
@@ -127,7 +129,7 @@ class PayrollPeriodController extends Controller
         return back()->with('status', 'Payroll period sent back for review.');
     }
 
-    public function finalize(PayrollPeriod $payrollPeriod): RedirectResponse
+    public function finalize(PayrollPeriod $payrollPeriod, AuditLogger $auditLogger): RedirectResponse
     {
         $this->authorize('payroll.finalize');
         abort_unless($payrollPeriod->status === PayrollPeriodStatus::Approved, 422, 'Only an approved period can be finalized.');
@@ -137,6 +139,11 @@ class PayrollPeriodController extends Controller
             'finalized_at' => now(),
             'finalized_by' => request()->user()->id,
         ]);
+
+        $auditLogger->log(request()->user(), AuditAction::Finalized, 'Payroll', $payrollPeriod,
+            ['status' => PayrollPeriodStatus::Approved->value],
+            ['status' => PayrollPeriodStatus::Finalized->value],
+        );
 
         return back()->with('status', 'Payroll period finalized -- it is now immutable.');
     }

@@ -259,7 +259,12 @@ non-negotiable — don't relax these for convenience):
   X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-
   Policy/conditional HSTS on every response, deliberately tuned — not
   blindly strict — to this app's real inline-script/inline-style/Alpine
-  usage). See Security Hardening below.
+  usage) and a **generic Audit Log** (`audit_logs` + `AuditLogger`,
+  wired at eight sensitive mutation points named by blueprint §51
+  17.24 — user creation/role changes/disable-enable, role permission
+  changes, salary changes, payroll finalization — gated by the
+  long-reserved `audit-logs.view` permission). See Security Hardening
+  below.
 
 **Not started:** the remainder of Phase 17, then Phase 18 (Production,
 Backup & Disaster Recovery). Follow the phase order in blueprint
@@ -2134,6 +2139,113 @@ response headers PHP-FPM/nginx add by default — that's `expose_php =
 Off` and `server_tokens off`, infrastructure-level config that belongs
 to Phase 18 ("Nginx/PHP-FPM" deployment), not something a Laravel
 middleware can control.
+
+**17b — Generic Audit Log.** Blueprint §51 17.16's worked example
+(`User: John Smith / Action: UPDATE / Module: Employee Compensation /
+Before: ₱30,000 / After: ₱35,000`) is a cross-module security trail
+distinct from every log this app already has: `login_logs` (Phase 3),
+`attendance_correction_logs` (Phase 8), `leave_transactions` (Phase 9),
+and `payslip_access_logs` (Phase 12c) each cover one module's own
+concern, but nothing gave a security reviewer one place to see every
+sensitive change across the app. A new `audit_logs` table (`user_id`
+nullable — a console/system action has none; `action`, an
+`App\Enums\AuditAction` string-backed enum with a `label()`, the same
+"enum owns its display string" idiom `OffboardingStatus`/`BenefitType`
+already established; `module`, a plain string label like blueprint's own
+example, not an enum — it's freeform display text with no behavior
+attached, unlike `action`; polymorphic `auditable_type`/`auditable_id`;
+`before`/`after` JSON; `ip_address`; `created_at` only, no `updated_at`)
+plus `App\Domain\Security\Services\AuditLogger::log()`, the one place
+that writes a row, following the same "Security" architectural leg
+blueprint §48's own diagram draws alongside Authentication/Authorization
+— `DataScopeResolver` (Phase 13e) already lives in
+`App\Domain\Security\Services\`, so this does too.
+
+**`before`/`after` are small, hand-picked scalar arrays, never a raw
+model dump.** Blueprint's own example logs exactly one field
+(`basic_salary`), not every column on the row — a full-model diff would
+bury the one meaningful change under boilerplate (`updated_at` touches,
+unrelated columns) and risk leaking fields a reviewer has no business
+seeing in a security log. Every call site is responsible for passing
+only plain strings (arrays like a role list are joined with
+`implode(', ', ...)` before logging, e.g. `'roles' => implode(', ',
+$newRoles) ?: '(none)'`) — the index view's `{{ }}` echo of `$log->before
+[$field]`/`$log->after[$field]` would break on a nested array, so this
+discipline is enforced at the write side rather than papered over with
+defensive casting in the view, matching this codebase's general
+preference for fixing correctness at the source.
+
+**Wired at eight call sites chosen to match blueprint §51 17.24's
+"Sensitive Operations" list directly, not applied blanket via a model
+observer.** A generic "audit every model change" observer was considered
+and rejected: it would log every trivial internal update indiscriminately
+(no way to distinguish "sensitive" from routine without per-model
+configuration anyway) and bury the log's real signal under noise —
+explicit calls at named sensitive mutation points is the same judgment
+call CLAUDE.md's Attendance section already made choosing direct
+`AttendanceCorrectionService::apply()` calls over a blanket model-event
+approach. Wired: `UserController::store()`/`updateRoles()`/`disable()`/
+`enable()` ("User creation," implicit in "Role changes," and account
+status changes); `RoleController::store()`/`update()` ("Role changes,"
+"Permission changes" — `update()`'s action is
+`AuditAction::PermissionsChanged` specifically, capturing the role's
+permission list and `data_scope` before/after); `EmploymentController
+::store()`, but *only* when the new row's `basic_salary` actually
+differs from the prior current row's ("Salary changes" — Employment
+itself, per CLAUDE.md's own Employment section, is already the real
+append-only source of truth for compensation history; this is a
+secondary entry for the cross-module security view, not a second
+history mechanism, so a same-salary employment change like a
+regularization or transfer correctly writes no entry at all, confirmed
+by `AuditLoggingTest::test_an_employment_change_without_a_salary_change
+_writes_no_audit_entry()`); and `PayrollPeriodController::finalize()`
+("Payroll finalization"). Left as documented gaps rather than sprinkled
+everywhere: password/MFA changes and login/logout already have their
+own dedicated coverage (`SecurityAlert` emails, `login_logs`) that this
+table would only duplicate; document downloads and bulk exports have no
+generic audit entry yet since neither blueprint's example nor 17.24
+singles them out as urgently as the eight wired here.
+
+**No `update()`/`destroy()` exist on `AuditLogController` at all** — the
+same "protection by omission" `EmploymentController`'s append-only shape
+and finalized `PayrollPeriod` already rely on, satisfying blueprint's
+"Audit logs should be protected from ordinary modification and
+deletion" without needing a model-level guard for a code path that
+can't be reached in the first place.
+
+**Gated by `audit-logs.view`, reserved in the seeded catalog since Phase
+4 but — like `organization.manage` before it — granted to no role by
+default.** Superadmin's `Gate::before()` bypass covers access today;
+deciding which roles should see a company's full security audit trail
+is a real judgment call for whoever deploys this, not one to make
+speculatively here. Lights up the ADMINISTRATION > Audit Logs sidebar
+placeholder. The index page filters by module/action via the same
+`onchange="this.form.submit()"` auto-submit pattern used throughout the
+admin views, paginated, newest first.
+
+**Verified with Playwright, including one script-only bug that produced
+a genuinely confusing false negative before being traced to its real
+cause.** Filtering the index by module appeared to show zero rows
+immediately after `selectOption()`, while a slightly later assertion on
+the same page state showed the row correctly present — `page.selectOption()`
+resolves once the `<select>`'s value updates, but does not wait for the
+navigation the `onchange="this.form.submit()"` handler goes on to
+trigger, so an assertion made immediately afterward can race a
+form-submission navigation that hasn't started yet, reading stale
+pre-navigation state (confirmed by checking `page.url()` at the same
+point: it still showed the un-filtered URL with no `?module=` query
+string at all). Fixed by wrapping the select in `Promise.all([page
+.waitForNavigation(), page.selectOption(...)])` so the navigation wait
+is registered before the action fires, rather than after — the same
+family of issue as this project's established tab-reselection and
+flash-message-timing lessons (a Playwright assertion racing an
+async page transition), not a new class of bug, but a new trigger for
+it (a plain `<select>` auto-submit rather than a full-page redirect).
+Ground-truthed afterward: disabling a user through the real UI produced
+a correctly-shaped row (actor, `Disabled` badge, `User Management`
+module, `User #<id>` record, `disabled_at: (active) → <timestamp>`
+change line) visible on the index page and survivable through the
+module filter.
 
 ## Commands
 
