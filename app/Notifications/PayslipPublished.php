@@ -4,10 +4,11 @@ namespace App\Notifications;
 
 use App\Models\PayrollItem;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PayslipPublished extends Notification
+class PayslipPublished extends Notification implements ShouldQueue
 {
     use Queueable;
 

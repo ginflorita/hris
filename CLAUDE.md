@@ -283,15 +283,19 @@ non-negotiable — don't relax these for convenience):
   **Scheduler** (Laravel's scheduler wired up for the first time in
   this app; `leave:accrue`/`leave:carry-over` close the Leave accrual
   gap Phase 9 documented, `training:send-certificate-expiration-
-  reminders` closes the Training gap Phase 15f documented). See
-  Production, Backup & Disaster Recovery below.
+  reminders` closes the Training gap Phase 15f documented) and **real
+  queued notifications** (`SecurityAlert`/`PayslipPublished`/
+  `TrainingCertificateExpiring` now implement `ShouldQueue`, verified
+  genuinely queued against the real `database` queue connection, not
+  just interface-compliant). See Production, Backup & Disaster
+  Recovery below.
 
-**Not started:** the remainder of Phase 18 — queue workers, backup/
-restore, production deployment config, CI/CD, and disaster recovery
-documentation. Follow the phase order in blueprint §54/§59; don't jump
-ahead to a later phase's tables/UI before its dependencies exist.
-Re-read the relevant blueprint section before starting a phase — this
-file is a summary, not a substitute.
+**Not started:** the remainder of Phase 18 — backup/restore, production
+deployment config (including the queue worker process itself), CI/CD,
+and disaster recovery documentation. Follow the phase order in
+blueprint §54/§59; don't jump ahead to a later phase's tables/UI before
+its dependencies exist. Re-read the relevant blueprint section before
+starting a phase — this file is a summary, not a substitute.
 
 ## Authentication
 
@@ -2568,6 +2572,56 @@ CarryOverLeaveBalancesTest,SendTrainingCertificateExpirationRemindersTest}.php`)
 passed on the first run, and `php artisan schedule:list` confirmed all
 three entries register with the intended cadence before any test was
 even written.
+
+**18b — Queue workers.** Blueprint §46 lists email/bulk notifications
+among what should be queued. All three of this app's `Notification`
+classes (`SecurityAlert`, `PayslipPublished`, and 18a's new
+`TrainingCertificateExpiring`) already used the `Queueable` trait every
+notification gets by default, but none implemented `ShouldQueue` --
+meaning every one of them actually sent synchronously, inline in
+whatever request or command triggered it, despite carrying the
+plumbing to do otherwise. All three now implement `ShouldQueue`.
+
+**Verified as genuinely queued, not just interface-compliant** --
+`QueuedNotificationsTest` pins down the `implements ShouldQueue` change
+itself (a real regression against it quietly being dropped later), but
+that alone doesn't prove queuing actually *works*, since `phpunit.xml`
+forces `QUEUE_CONNECTION=sync` for every test (matching current
+behavior exactly, which is *why* zero existing tests broke from this
+change -- `sync` still runs a job's handler inline). The genuine,
+non-test proof: triggering `$user->notify(new SecurityAlert(...))`
+against the real local `.env` (`QUEUE_CONNECTION=database`, per
+CLAUDE.md's own Stack section) inserted a real row into the `jobs`
+table rather than sending immediately; running `php artisan queue:work
+--once --stop-when-empty` against it completed the job and removed the
+row, with nothing landing in `failed_jobs`.
+
+**Queue *workers* -- the actual always-running `queue:work` process a
+deployment needs -- are an infrastructure concern, not a code one, and
+are deliberately deferred to 18d** rather than half-built here: a
+Supervisor/systemd unit definition belongs alongside 18d's other
+deployment config (Nginx, PHP-FPM) as one coherent set, not
+fragmented across two separate slices. Until that worker process
+exists in a real deployment, queued notifications would sit in `jobs`
+until something processes them -- true of any Laravel app's queue
+system, not a gap specific to this one, and exactly why blueprint lists
+"Queue workers" as its own bullet alongside "Use Laravel queues" as a
+separate one.
+
+**Fully async payroll processing / PDF generation / bulk exports --
+also named in blueprint §46 -- stay synchronous, a deliberate,
+documented gap, not an oversight.** Converting `PayrollCalculationService
+::process()` or payslip PDF generation into queued jobs is a real UI/UX
+change (the admin currently gets an immediate "processed" result;
+async would need a "processing..." state and a way to learn when it's
+done -- polling, a notification, or similar), not a one-line
+`ShouldQueue` addition the way notifications were. Building that
+without a concrete requirement for how the UI should reflect
+in-progress async state would be guessing at a feature, not hardening
+a deployment -- the same restraint this app already applies to
+overtime/holiday pay rates and `PerPayPeriod` accrual (18a). A natural
+candidate whenever a future phase actually needs payroll processing to
+survive a request timeout on a very large company, not before.
 
 ## Commands
 
