@@ -279,11 +279,19 @@ non-negotiable — don't relax these for convenience):
   hardening, CI/CD, monitoring integration, penetration testing,
   vulnerability scanning).
 
-**Not started:** Phase 18 (Production, Backup & Disaster Recovery).
-Follow the phase order in blueprint §54/§59; don't jump ahead to a
-later phase's tables/UI before its dependencies exist. Re-read the
-relevant blueprint section before starting a phase — this file is a
-summary, not a substitute.
+- Phase 18 (partial) — Production, Backup & Disaster Recovery:
+  **Scheduler** (Laravel's scheduler wired up for the first time in
+  this app; `leave:accrue`/`leave:carry-over` close the Leave accrual
+  gap Phase 9 documented, `training:send-certificate-expiration-
+  reminders` closes the Training gap Phase 15f documented). See
+  Production, Backup & Disaster Recovery below.
+
+**Not started:** the remainder of Phase 18 — queue workers, backup/
+restore, production deployment config, CI/CD, and disaster recovery
+documentation. Follow the phase order in blueprint §54/§59; don't jump
+ahead to a later phase's tables/UI before its dependencies exist.
+Re-read the relevant blueprint section before starting a phase — this
+file is a summary, not a substitute.
 
 ## Authentication
 
@@ -2473,6 +2481,93 @@ documentation (17d). What remains — infrastructure hardening, CI/CD,
 monitoring integration, and third-party penetration testing/vulnerability
 scanning — is Phase 18's job or a real deployment's own security review,
 not a gap in this phase's own scope.
+
+## Production, Backup & Disaster Recovery (Phase 18, in progress)
+
+Blueprint §54's final phase. Unlike every prior phase, most of its
+bullets (Nginx/PHP-FPM, monitoring, CI/CD, disaster recovery) describe
+*infrastructure and process* a real deployment needs, not application
+features — this phase is built the same sub-slice way as every other
+multi-part phase, but expect a higher proportion of config/scripts/docs
+alongside application code than usual, and expect some bullets to stay
+documented process rather than runnable code, the same honesty this
+file already applies to things a coding session can't self-certify
+(Phase 17d's penetration testing / vulnerability scanning gap).
+
+**18a — Scheduler.** Blueprint §47 names ten things to automate; this
+slice builds the two blueprint explicitly names first and that CLAUDE.md
+had already flagged, in Leave's and Training's own sections, as waiting
+for exactly this moment: **Leave accrual** and **certificate expiration
+reminders**. Neither `app/Console/` nor `routes/console.php`'s scheduler
+had ever been used before this slice (`php artisan schedule:list`
+reported zero tasks) — Laravel 12's skeleton needs no `Kernel.php` or
+`bootstrap/app.php` change, just `Schedule::command(...)` calls directly
+in `routes/console.php`, which is where these three now live.
+
+`App\Console\Commands\AccrueLeaveBalances` (`leave:accrue`, scheduled
+daily at 01:00) walks every active `LeavePolicy` and self-gates *which*
+ones are actually due against today's date — `Monthly` fires on the
+1st, `Annually` fires only on January 1st — rather than relying on the
+cron cadence alone, since a single daily trigger has to serve both
+frequencies correctly. Accrual is capped at the policy's `max_balance`
+when set (accruing the smaller of the policy's rate or the room left
+below the cap, and skipping entirely once a balance is already at the
+cap) rather than blindly adding the full rate every time. Employees are
+resolved as every active (`archived_at IS NULL`) employee of the
+policy's `company_id` — `LeavePolicy` has no finer-grained per-employee
+assignment table (confirmed by grep before designing this), so "every
+employee at this company" is the only consistent interpretation
+matching how `LeaveBalance` itself is keyed by `(employee_id,
+leave_type_id)` alone, with no `leave_policy_id` column to narrow by.
+
+**`AccrualFrequency::PerPayPeriod` is a deliberate, documented gap, not
+silently skipped** — `isDueToday()` returns `false` for it outright.
+Firing it correctly needs each employee's own `PayrollGroup` pay
+frequency (weekly/biweekly/semi-monthly/monthly, set on `Employment`,
+not on `LeavePolicy` at all) to know which days are real period
+boundaries, which would mean re-deriving Payroll's own period logic
+inside the Leave domain without a concrete requirement for how the two
+should actually line up — the same restraint this app already applies
+to overtime/holiday pay rates and Benefits' SSS/PhilHealth/Pag-IBIG
+consolidation.
+
+**`App\Console\Commands\CarryOverLeaveBalances` (`leave:carry-over`,
+scheduled `yearlyOn(1, 1, '01:30')`)** is the natural pairing
+`LeaveTransactionType::CarryOver` was reserved for back in Phase 9
+("exist in the ledger's vocabulary for when that job is built," written
+about `Accrual` and `CarryOver` together). A policy's `carry_over_days`
+is a *cap* on what survives into the new year, not an amount to add —
+any balance above it is forfeited down to the cap (logged as a negative
+`CarryOver` transaction so the ledger shows exactly what was lost and
+why); a balance at or below it is left untouched, and a policy with no
+`carry_over_days` set is skipped entirely (unlimited carry-over, nothing
+to cap). Unlike `AccrueLeaveBalances`, this command does no internal
+date-gating — it has exactly one frequency, so the schedule entry's own
+`yearlyOn()` is the only date check needed.
+
+**`App\Console\Commands\SendTrainingCertificateExpirationReminders`**
+(scheduled daily at 07:00) closes the gap 15f's CLAUDE.md section
+documented almost verbatim ("a natural candidate whenever this app
+grows a job-scheduling story for the first time" — this is that
+moment). Fires at exactly two thresholds, 30 and 7 days before
+`certificate_expires_at`, matched by exact date
+(`whereDate('certificate_expires_at', today+N)`) rather than a "less
+than N days away" range — that sends each reminder exactly once per
+enrollment without needing a new "already reminded" tracking column,
+the same reasoning `TrainingEnrollment` itself already avoided a
+separate attendance table for. A new `TrainingCertificateExpiring`
+notification (`Queueable`-but-not-yet-`ShouldQueue`, matching
+`PayslipPublished`'s and `SecurityAlert`'s existing shape until 18b)
+goes only to employees with a linked `User` account, silently skipping
+unlinked ones — the same pattern `PayrollPeriodController::publish()`
+already established for `PayslipPublished`.
+
+**Bug caught: none.** All 14 new tests
+(`tests/Feature/Console/{AccrueLeaveBalancesTest,
+CarryOverLeaveBalancesTest,SendTrainingCertificateExpirationRemindersTest}.php`)
+passed on the first run, and `php artisan schedule:list` confirmed all
+three entries register with the intended cadence before any test was
+even written.
 
 ## Commands
 
