@@ -34,4 +34,9 @@ class WorkflowDefinition extends Model
     {
         return $this->hasMany(WorkflowStep::class)->orderBy('step_order');
     }
+
+    public function instances(): HasMany
+    {
+        return $this->hasMany(WorkflowInstance::class);
+    }
 }

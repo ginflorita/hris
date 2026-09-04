@@ -351,8 +351,22 @@ file is a summary, not a substitute) before extending any area further.
   `workflow.manage` permission pair — is done; a real
   `Route::resource()` wildcard-vs-model-name mismatch was caught by the
   test suite (implicit binding was silently constructing an empty,
-  unsaved model instead of binding the real row) and fixed. See
-  Workflow below.
+  unsaved model instead of binding the real row) and fixed. (20b)
+  `WorkflowInstance`/`WorkflowInstanceStep` plus
+  `App\Domain\Workflow\Services\WorkflowEngine` — starting, advancing,
+  rejecting, and cancelling a real instance, snapshotting each step at
+  start so a later definition edit can't rewrite history, Manager/
+  Permission approver resolution reusing existing RBAC and org data
+  (with a leading unresolvable Manager step auto-skipped, and an
+  all-unresolvable or zero-step instance auto-approved rather than left
+  stuck), and a generic `Admin\WorkflowInstanceController` approvals
+  inbox whose authorization is fully dynamic (no `$this->authorize()`
+  call at all) — proven end-to-end against
+  `EmployeeInformationChangeRequest`, the engine's first real subject,
+  through a real two-step manager-then-HR approval verified live in the
+  browser. A real bug (the approvals inbox never rendered its
+  `session('status')` flash) was caught by that Playwright pass, not by
+  the 24 new feature tests, and fixed. See Workflow below.
 
 ## Authentication
 
@@ -3273,13 +3287,159 @@ implicit binding can silently construct an empty model instead of
 failing loudly, and nothing catches it short of asserting the actual
 persisted state after a write.
 
-**Deliberately not yet built (20b/20c)**: `WorkflowInstance`/
-`WorkflowInstanceStep` (the actual engine mechanics -- starting a
-workflow, resolving who can act on the current step, advancing/
-rejecting), a generic admin approvals inbox, and the Employee
-Information Change self-service feature that will be this engine's
-first real consumer. A `WorkflowDefinition` with steps exists today but
-nothing can start an instance against one yet -- that's 20b's job.
+**20b -- Instances + the engine itself.** `WorkflowInstance` (one row
+per real request: `workflow_definition_id`, `company_id`, a polymorphic
+`subject_type`/`subject_id`, `initiated_by` nullable, `status`,
+`current_step_order` nullable, `completed_at`) and
+`WorkflowInstanceStep` (that instance's per-step progress) are where a
+definition actually gets *run*. `App\Domain\Workflow\Services\
+WorkflowEngine` is the one place instances are started and advanced --
+`Admin\WorkflowInstanceController` only resolves the instance/current
+step and calls into it, the same "payroll logic never lives in
+controllers" discipline applied to a new domain.
+
+**Snapshot at start, not a live read through `workflow_step_id`.**
+`start()` copies each `WorkflowStep`'s `name`/`approver_type`/
+`required_permission` onto the new `WorkflowInstanceStep` row at the
+moment the instance begins; `workflow_step_id` is kept only as a soft
+backreference. Editing a step's approver after instances already exist
+against its definition (a real scenario -- an admin can always edit an
+active definition) must not silently change what an in-flight or
+historical approval meant, the same principle `CoeRequest`'s snapshot
+columns established for Employment data in 13d. Proven by a dedicated
+test (`test_starting_an_instance_snapshots_steps_from_the_definition_at
+_creation_time`) that mutates the live `WorkflowStep` after starting an
+instance and asserts the already-created `WorkflowInstanceStep` is
+unaffected.
+
+**Approver resolution reuses this app's existing RBAC and org data --
+no parallel approver-assignment system.** `WorkflowApproverType::Manager`
+resolves via the subject's `HasWorkflowSubjectEmployee::workflowEmployee()`
+-> `currentEmployment` -> `manager` -> that manager's linked `User`
+(the exact chain Team data scope already uses); `::Permission` is
+`$user->can($step->required_permission)` against the real permission
+catalog. A leading `Manager` step with no resolvable manager (no
+current employment, or a manager with no linked account) is
+auto-skipped rather than left stuck forever --
+`advancePastUnresolvableManagerSteps()` walks forward marking each such
+step `Skipped` until it lands on a real actionable step or runs out; if
+*every* step turns out unresolvable (or a definition has zero steps at
+all -- the `start()`-time check for that exact case), the instance is
+auto-approved outright, the same "nothing left to block on" reasoning
+`EmployeeOnboarding` already applies to a zero-task checklist. Both
+paths call `applyWorkflowApproval()` on the subject, if it implements
+`AppliesOnWorkflowApproval` -- an approval that happened to need zero
+human decisions still has to apply.
+
+**Two small contracts, not a base class, are what a subject implements
+to plug into the engine**: `HasWorkflowSubjectEmployee` (whose employee
+is this about, for manager resolution) and `AppliesOnWorkflowApproval`
+(what to actually change when every step clears). `subject_type`/
+`subject_id` store the plain class name, no morph map -- the same
+convention `audit_logs.auditable_type` already established.
+
+**`EmployeeInformationChangeRequest` is the engine's first real
+subject** -- a small, deliberately restrained set of self-service-
+editable bio fields (`requested_mobile`/`requested_email`/
+`requested_civil_status`/`requested_nationality`; not name/employee
+number, which are identity fields with their own integrity concerns,
+and not address/emergency contact, which already have their own
+sub-resources). Explicit `requested_*` columns rather than a JSON diff
+blob, matching `AttendanceCorrectionRequest`'s own shape. **No status
+column at all** -- unlike `AttendanceCorrectionRequest`, which predates
+this engine and owns its status outright, this table's entire lifecycle
+lives on its `WorkflowInstance` via the polymorphic `subject` relation,
+the whole point of building this as the engine's first consumer rather
+than another bespoke table. `applyWorkflowApproval()` writes only the
+non-null requested fields onto the `Employee` row (`array_filter(...,
+fn ($v) => $v !== null)`) -- a request that only proposed a mobile
+change must not blank out email/civil status/nationality.
+
+**`Admin\WorkflowInstanceController` has no `$this->authorize()` call
+anywhere in it -- a genuinely different authorization shape from every
+other admin controller in this app.** "Who can act" is dynamic per
+step, not a static permission, so there's no single check that would
+mean the right thing. `index()` is a personal inbox
+(`WorkflowEngine::pendingStepsFor($user)`, itself filtered to steps
+that are both the instance's *current* step and pass `canAct()` --
+proven by a test that confirms a later step's permission-holder sees
+nothing until the earlier step actually clears, not just "any pending
+step naming their permission somewhere in the instance"). `show()`
+gates on `canAct() || hasActed` (already having decided this instance's
+own history stays visible after the fact, just without action buttons
+-- proven by `test_show_remains_visible_after_acting_but_without_action
+_buttons`), a 403 otherwise. `pendingStepsFor()` queries globally, not
+company-scoped, matching this app's already-documented admission that
+Company-level data scope is unenforced everywhere else too.
+
+**A real bug, caught by Playwright, not by the test suite**:
+`instances/index.blade.php` never rendered a `session('status')` alert
+block. Every other custom (non-`<x-admin.resource-index>`) list/show
+page in this app has needed this reminder at least once (15e's course
+show page, 17b's audit log index) -- this is the same class of bug
+again, just on an index page instead of a show page this time. The
+approve/reject actions themselves worked correctly throughout (proven
+by the feature test suite, which asserts against `session('status')`
+directly rather than rendering it), so nothing in the test suite could
+have caught a purely view-layer omission -- only actually loading the
+page after approving, the way a real HR reviewer would, surfaced it.
+Fixed by adding the same `@session('status')`/`$errors->any()` block
+`admin.employees.show` established, verbatim.
+
+**Verified with Playwright against a real two-step flow, not a
+synthetic single-step demo.** Seeded a company with a manager/report
+pair and an HR-permission holder, a definition with a `Manager` step
+followed by a `Permission` step, and a real
+`EmployeeInformationChangeRequest` proposing a mobile and email change;
+started the instance via the engine directly (there's no self-service
+UI yet -- that's 20c). Logged in as the manager: the inbox correctly
+showed the request, the show page correctly rendered the requested-vs-
+current diff card (`_employee-information-change-subject.blade.php`)
+and the reason text, approving redirected to the inbox with the flash
+message now visible and the request gone from the manager's own list.
+Logged in as the HR holder next: the inbox now correctly showed the
+*same* request (advanced to the `HR Approval` step), the step timeline
+correctly showed the manager's step as `Approved`, and approving
+completed the instance. Confirmed directly against the database
+afterward (not just the rendered page): `status=approved`,
+`completed_at` set, and -- proving `applyWorkflowApproval()` actually
+fired through the real HTTP path, not just in an isolated test --
+the employee's `mobile`/`email` columns held the *requested* values.
+Zero browser console errors across the whole flow.
+
+**Test coverage**: 24 new tests -- including one on the 20a suite,
+`test_a_definition_with_instance_history_cannot_be_deleted`, pinning
+down `WorkflowDefinitionController::destroy()`'s guard against deleting
+a definition with any instance history (added this slice, once
+`instances()` existed to check), the asymmetric counterpart to 20a's
+already-documented "a step needs no such guard, snapshotting already
+protects it" decision. `WorkflowEngineTest`
+(`tests/Feature/Domain/Workflow/`) calls `WorkflowEngine` directly, the
+same "invoke the domain service via `app()`" convention `LeaveTest`/
+`PayrollAdjustmentTest` already use for `LeaveBalanceService`/
+`PayrollCalculationService` -- covering snapshotting, both
+manager-resolution paths (auto-skip, all-unresolvable-auto-approves),
+multi-step progression with the approval callback only firing on final
+approval (not mid-flow), rejection terminality plus cascade-`Skipped`
+of every remaining pending step, `pendingStepsFor`'s current-step-only
+filtering, and every `abort_unless` guard in `act()`/`cancel()`
+including one (a step already decided while still nominally "current")
+that can't happen through normal engine-driven flow at all and had to
+be simulated directly, the same kind of defensive-guard-only-reachable-
+by-simulation situation as a concurrent double-submit.
+`WorkflowInstanceControllerTest` (`tests/Feature/Admin/Workflow/`)
+covers the HTTP layer: the inbox's dynamic filtering, `show`'s
+`canAct||hasActed` gate in both directions, approve/reject end to end,
+reject's required-`comments` validation, and the 422 a stale approve
+click produces once nothing is left to act on.
+
+**Deliberately not yet built (20c)**: the actual employee-facing
+self-service page for *submitting* an Employee Information Change
+request -- everything this slice built only has a real consumer today
+via `tinker`/factories. A `WorkflowDefinition` with steps can now run
+real instances end-to-end, but nothing employee-facing can start one
+yet; that's 20c's job, alongside wiring the new request type into the
+existing Phase 13f Requests aggregation view.
 
 ## Commands
 

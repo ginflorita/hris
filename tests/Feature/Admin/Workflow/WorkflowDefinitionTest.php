@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Admin\Workflow;
 
+use App\Domain\Workflow\Services\WorkflowEngine;
 use App\Enums\WorkflowProcessType;
 use App\Models\Company;
+use App\Models\EmployeeInformationChangeRequest;
 use App\Models\User;
 use App\Models\WorkflowDefinition;
 use App\Models\WorkflowStep;
@@ -156,5 +158,19 @@ class WorkflowDefinitionTest extends TestCase
             'name' => 'Renamed',
             'approver_type' => 'manager',
         ])->assertNotFound();
+    }
+
+    public function test_a_definition_with_instance_history_cannot_be_deleted(): void
+    {
+        $user = $this->manager();
+        $definition = WorkflowDefinition::factory()->create();
+        $subject = EmployeeInformationChangeRequest::factory()->create();
+        app(WorkflowEngine::class)->start($definition, $subject, null);
+
+        $this->actingAs($user)->delete(route('admin.workflow.definitions.destroy', $definition))
+            ->assertRedirect()
+            ->assertSessionHasErrors('workflowDefinition');
+
+        $this->assertNotSoftDeleted($definition);
     }
 }

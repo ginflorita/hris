@@ -75,6 +75,10 @@ class WorkflowDefinitionController extends Controller
     {
         $this->authorize('workflow.manage');
 
+        if ($workflowDefinition->instances()->exists()) {
+            return back()->withErrors(['workflowDefinition' => 'This workflow has requests that have used it and can\'t be deleted. Mark it inactive instead.']);
+        }
+
         $workflowDefinition->steps()->delete();
         $workflowDefinition->delete();
 
