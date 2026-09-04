@@ -335,7 +335,7 @@ file is a summary, not a substitute) before extending any area further.
   pickers both non-deterministic on a tied `start_date`) was caught and
   fixed in 19c. See Reports below.
 
-- Phase 20 (in progress) — Workflow: blueprint §27 gives the least spec
+- Phase 20 (complete) — Workflow: blueprint §27 gives the least spec
   of any module built so far (six suggested table names, a list of 8
   processes, one line of rationale, no fields or state diagram) and,
   like Reports before it, is never assigned to a §54 phase. This
@@ -366,7 +366,22 @@ file is a summary, not a substitute) before extending any area further.
   through a real two-step manager-then-HR approval verified live in the
   browser. A real bug (the approvals inbox never rendered its
   `session('status')` flash) was caught by that Playwright pass, not by
-  the 24 new feature tests, and fixed. See Workflow below.
+  the 24 new feature tests, and fixed. (20c)
+  `Portal\EmployeeInformationChangeController` — the actual employee-
+  facing front door onto 20a/20b, closing the gap Phase 13a's own
+  `ProfileController` doc comment flagged: a history-plus-modal-submit
+  page (the same shape `Portal\CoeRequestController` already
+  established) that looks up the company's own active
+  `EmployeeInformationChange` definition and starts a real instance
+  through it, with no `employee_id` field on the form at all — the same
+  IDOR-prevention-by-omission every other portal controller already
+  uses. Wired into the Phase 13f Requests aggregation view as a fifth
+  request type. Verified end-to-end live in the browser reusing 20b's
+  own seeded accounts: a brand-new portal-submitted request, a second
+  real manager-then-HR approval, and a database check afterward
+  confirming the employee's record updated only in the one field this
+  request actually touched. Blueprint §27 is now built end-to-end. See
+  Workflow below.
 
 ## Authentication
 
@@ -3175,7 +3190,7 @@ fallback; a module's own tighter `.view` permission — `attendance.view`/
 sensitive enough to warrant it) is documented above per-slice rather
 than applied as one blanket rule.
 
-## Workflow (Phase 20, in progress)
+## Workflow (Phase 20, complete)
 
 Blueprint §27, "Workflow Engine" — a module named throughout this
 project's own history (Attendance's Overtime section, Recruitment's
@@ -3433,13 +3448,106 @@ covers the HTTP layer: the inbox's dynamic filtering, `show`'s
 reject's required-`comments` validation, and the 422 a stale approve
 click produces once nothing is left to act on.
 
-**Deliberately not yet built (20c)**: the actual employee-facing
-self-service page for *submitting* an Employee Information Change
-request -- everything this slice built only has a real consumer today
-via `tinker`/factories. A `WorkflowDefinition` with steps can now run
-real instances end-to-end, but nothing employee-facing can start one
-yet; that's 20c's job, alongside wiring the new request type into the
-existing Phase 13f Requests aggregation view.
+**20c -- Employee Information Change self-service, closing Phase 20.**
+`Portal\EmployeeInformationChangeController` is the actual employee-
+facing front door onto everything 20a/20b built -- the exact "real,
+already-flagged gap" the top of this section named as this phase's
+whole reason for existing (`Portal\ProfileController`'s own doc comment
+had said "isn't built yet" since Phase 13a). Same shape as
+`Portal\CoeRequestController`: one page (`index()`) combining a history
+table with a modal submit form, no separate create/index split. `store()`
+hard-codes `employee_id`/`company_id` from the authenticated user's own
+`employee` -- there is no such input field on the form at all, the same
+IDOR-prevention-by-omission Phase 13b's portal Leave/Overtime
+controllers already established, not a check that could be bypassed so
+much as a field that was never accepted in the first place.
+
+**Looks up the company's active `EmployeeInformationChange`
+`WorkflowDefinition` itself -- there's no admin step that hands a
+portal controller "the" definition to use.** `activeDefinitionFor()`
+queries `company_id` + `process_type` + `is_active`, the exact lookup
+20a's own docblock said this design was *for* ("how a real consumer
+looks up 'the active definition for my process at my company' without
+a fragile name match"). No definition configured is a real, reachable
+state (a fresh company, or HR hasn't gotten to it yet) -- handled at
+both layers: the view hides the "Request a Change" button and shows a
+plain "contact HR" notice (`definitionAvailable`, the same view-level
+guard shape `Portal\ProfileController` already uses for an unlinked
+account), and `store()` itself still aborts 422 if reached directly,
+the defense-in-depth backend half of a check whose primary UX guard is
+the view.
+
+**Submitting a change validates "at least one field actually changed"
+as a real, redirect-back-with-errors case (not a raw abort)** --
+reachable through completely normal use (a reason with nothing
+selected to change), unlike the "no definition" abort above, which
+Superadmin/HR misconfiguration aside, isn't something a correctly-
+functioning UI should ever let a user reach. Nothing on the `Employee`
+row changes at submission regardless -- that's the whole point of
+routing this through the engine instead of a direct `update()`, pinned
+down by a test that submits a change and asserts the employee's own
+column is still the *old* value immediately afterward.
+
+**`Portal\RequestController`'s aggregation view (13f) gained a fifth
+request type**, `informationChangeRequests` (a new `Employee::
+informationChangeRequests()` relation, the same shape as
+`coeRequests()`/`leaveRequests()`), read status through the polymorphic
+`workflowInstance` relation rather than a status column of its own --
+consistent with 20b's own "no status column at all" design for this
+model. `RequestAggregationTest`'s existing "all four request types"
+test became "all five."
+
+**A small, pre-existing display inconsistency, caught while building
+this slice's own view, fixed in 20b's file too.** 20b's admin diff
+partial (`_employee-information-change-subject.blade.php`) rendered
+`CivilStatus` values raw (`married`) instead of this app's own
+established `ucfirst($case->value)` convention (`Married`) --
+`portal/profile/show.blade.php` and `admin/employees/show/_overview
+.blade.php` both already display the same enum this way. Not a new bug
+introduced this slice, but a real one only noticed because building
+this slice's own select-options dropdown required looking up how
+`CivilStatus` is displayed elsewhere first; fixed in both the new
+portal form and the 20b partial it was first caught in, rather than
+leaving the older file inconsistent with the new one.
+
+**Verified end-to-end in the browser against the real 20b verification
+data, not fresh fixtures** -- logged in as the same "Eddie Employee"
+account 20b's own Playwright pass used, submitted a second, genuinely
+new information-change request (this time a civil status change)
+through the real portal form for the first time (20b's original request
+had been created via `tinker`, since the portal UI didn't exist yet).
+Confirmed: the sidebar's new "Update My Information" link, the request
+button correctly gated on `definitionAvailable`, the prior (already-
+approved) request still visible in history, the new submission's flash
+message and "In Progress" status, and the same request surfacing on the
+Requests aggregation page. Then repeated 20b's manager-then-HR approval
+flow against this new instance from the admin side, and confirmed back
+on the portal page afterward: both requests now show "Approved," and --
+ground-truthed directly against the database, not just the rendered
+page -- the employee's `civil_status` column now reads `married` while
+`mobile` (never part of *this* request) stayed untouched, proving
+`applyWorkflowApproval()`'s non-null-only field filter really is
+scoped per-request, not a blanket sync. Zero console errors throughout.
+
+**Test coverage**: 9 new tests (`tests/Feature/Portal/
+EmployeeInformationChangeTest.php` plus the extended
+`RequestAggregationTest`) covering the unlinked-account message, the
+button/notice split on whether a definition exists, a successful
+submission's full effect (request created, instance started, employee
+record *not* yet touched), the at-least-one-field validation, the
+backend 422 guard when no definition exists, and the history view
+showing a submitted request's status. 478 tests passing repo-wide.
+
+Blueprint §27 (Workflow Engine) is now built end-to-end across 20a-20c:
+a reusable, generic approval engine (not a sixth bespoke flow) proven
+against a real, previously-flagged self-service gap, from admin
+configuration through to an employee actually using it and an HR
+approval actually changing their record. The 6+ already-shipped bespoke
+approval flows this phase deliberately didn't migrate (see this
+section's own opening) remain exactly that -- a real, sized follow-up
+for whenever migrating one of them is worth more than the risk of
+touching an already-working system, not a gap in this phase's own
+scope.
 
 ## Commands
 

@@ -32,8 +32,8 @@
             @if ($request->requested_civil_status !== null)
                 <tr>
                     <td>Civil status</td>
-                    <td>{{ $employee->civil_status?->value ?? '—' }}</td>
-                    <td>{{ $request->requested_civil_status->value }}</td>
+                    <td>{{ $employee->civil_status ? ucfirst($employee->civil_status->value) : '—' }}</td>
+                    <td>{{ ucfirst($request->requested_civil_status->value) }}</td>
                 </tr>
             @endif
             @if ($request->requested_nationality !== null)

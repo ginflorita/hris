@@ -134,6 +134,11 @@ class Employee extends Model
         return $this->hasMany(CoeRequest::class);
     }
 
+    public function informationChangeRequests(): HasMany
+    {
+        return $this->hasMany(EmployeeInformationChangeRequest::class);
+    }
+
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);

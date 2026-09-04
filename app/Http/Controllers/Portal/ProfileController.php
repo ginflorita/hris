@@ -12,9 +12,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Read-only self-service (blueprint §18 "View profile" / "View
  * employment" / "View documents"). Updating "permitted information" is
- * a real §18 bullet but isn't built yet -- see CLAUDE.md "Employee
- * Self-Service" for why that's a deliberate, separate slice rather than
- * bolted on here.
+ * a real §18 bullet, deliberately kept a separate slice rather than
+ * bolted on here -- see Portal\EmployeeInformationChangeController
+ * (Phase 20c), which routes a change through the Workflow engine rather
+ * than a direct edit here.
  */
 class ProfileController extends Controller
 {

@@ -6,10 +6,12 @@ use App\Models\Attendance;
 use App\Models\AttendanceCorrectionRequest;
 use App\Models\CoeRequest;
 use App\Models\Employee;
+use App\Models\EmployeeInformationChangeRequest;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
 use App\Models\User;
+use App\Models\WorkflowInstance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +26,7 @@ class RequestAggregationTest extends TestCase
         return User::factory()->create(['employee_id' => $employee->id]);
     }
 
-    public function test_lists_all_four_request_types_for_the_employee_only(): void
+    public function test_lists_all_five_request_types_for_the_employee_only(): void
     {
         $user = $this->employeeUser();
         $employee = $user->employee;
@@ -34,6 +36,11 @@ class RequestAggregationTest extends TestCase
         $attendance = Attendance::factory()->forEmployee($employee)->create();
         AttendanceCorrectionRequest::factory()->forAttendance($attendance)->create();
         CoeRequest::factory()->forEmployee($employee)->create();
+        $changeRequest = EmployeeInformationChangeRequest::factory()->forEmployee($employee)->create();
+        WorkflowInstance::factory()->create([
+            'subject_type' => $changeRequest->getMorphClass(),
+            'subject_id' => $changeRequest->id,
+        ]);
 
         // Someone else's requests must never appear.
         $stranger = Employee::factory()->create();
@@ -47,7 +54,8 @@ class RequestAggregationTest extends TestCase
         $this->assertContains('Overtime', $types);
         $this->assertContains('Attendance Correction', $types);
         $this->assertContains('Certificate of Employment', $types);
-        $this->assertCount(4, $types);
+        $this->assertContains('Information Change', $types);
+        $this->assertCount(5, $types);
     }
 
     public function test_unlinked_account_sees_a_friendly_message(): void

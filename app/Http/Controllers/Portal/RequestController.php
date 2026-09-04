@@ -9,9 +9,10 @@ use Illuminate\View\View;
 /**
  * Blueprint §41's portal sidebar lists "Requests" as one flat item
  * alongside the type-specific My Leave/My Overtime/My Attendance/Request
- * COE pages -- a single at-a-glance view across all four, not a
- * replacement for them. Each row links back to its own page for the
- * actual submit/cancel actions; this controller only reads and merges.
+ * COE/Update My Information pages -- a single at-a-glance view across
+ * all five, not a replacement for them. Each row links back to its own
+ * page for the actual submit/cancel actions; this controller only reads
+ * and merges.
  */
 class RequestController extends Controller
 {
@@ -28,6 +29,7 @@ class RequestController extends Controller
             'overtimeRequests',
             'attendanceCorrectionRequests.attendance',
             'coeRequests',
+            'informationChangeRequests.workflowInstance',
         ]);
 
         $requests = collect()
@@ -58,6 +60,13 @@ class RequestController extends Controller
                 'detail' => $r->type->label(),
                 'status' => $r->status->value,
                 'link' => route('portal.coe.index'),
+            ]))
+            ->concat($employee->informationChangeRequests->map(fn ($r) => (object) [
+                'type' => 'Information Change',
+                'date' => $r->created_at,
+                'detail' => $r->reason,
+                'status' => $r->workflowInstance?->status->value ?? 'unknown',
+                'link' => route('portal.information-change.index'),
             ]))
             ->sortByDesc('date')
             ->values();
