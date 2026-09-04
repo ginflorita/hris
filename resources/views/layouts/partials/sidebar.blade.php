@@ -5,8 +5,8 @@
     Shifts/Overtime/Holidays/Leave, PAYROLL > Compensation/Benefits,
     TALENT > Recruitment/Applicants/Onboarding/Performance/Training/
     Skills, REPORTS (all five items), and ADMINISTRATION > Users/Roles/
-    Permissions are real and permission-gated; the rest light up the
-    same way as their phase lands.
+    Permissions/Workflows are real and permission-gated; the rest light
+    up the same way as their phase lands.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -127,7 +127,7 @@
                 'Users' => ['route' => 'admin.users.index', 'can' => ['viewAny', \App\Models\User::class]],
                 'Roles' => ['route' => 'admin.roles.index', 'can' => ['viewAny', \App\Models\Role::class]],
                 'Permissions' => ['route' => 'admin.permissions.index', 'can' => ['viewAny', \App\Models\Role::class]],
-                'Workflows' => null,
+                'Workflows' => ['route' => 'admin.workflow.definitions.index', 'can' => ['workflow.view']],
                 'Notifications' => null,
                 'Announcements' => null,
                 'Audit Logs' => ['route' => 'admin.audit-logs.index', 'can' => ['audit-logs.view']],

@@ -335,6 +335,25 @@ file is a summary, not a substitute) before extending any area further.
   pickers both non-deterministic on a tied `start_date`) was caught and
   fixed in 19c. See Reports below.
 
+- Phase 20 (in progress) — Workflow: blueprint §27 gives the least spec
+  of any module built so far (six suggested table names, a list of 8
+  processes, one line of rationale, no fields or state diagram) and,
+  like Reports before it, is never assigned to a §54 phase. This
+  session's second continuation past §54's own list. Collapsed to 4
+  real tables; deliberately does *not* migrate the 6+ modules that
+  already have their own bespoke approval flow (Leave, Overtime,
+  Recruitment, COE, Offboarding, PIPs) — building the engine and
+  proving it against one genuinely new consumer (Employee Information
+  Change, a real gap Employee Self-Service's own Phase 13a section has
+  flagged since it was written) is this phase's scope, not a mass
+  retrofit of already-working systems. (20a) `WorkflowDefinition`/
+  `WorkflowStep` — the config layer, admin CRUD, a new `workflow.view`/
+  `workflow.manage` permission pair — is done; a real
+  `Route::resource()` wildcard-vs-model-name mismatch was caught by the
+  test suite (implicit binding was silently constructing an empty,
+  unsaved model instead of binding the real row) and fixed. See
+  Workflow below.
+
 ## Authentication
 
 Backend is Laravel Fortify (`laravel/fortify`), used **headless** — we
@@ -3141,6 +3160,126 @@ fallback; a module's own tighter `.view` permission — `attendance.view`/
 `training.view` — wherever one already existed and the data was
 sensitive enough to warrant it) is documented above per-slice rather
 than applied as one blanket rule.
+
+## Workflow (Phase 20, in progress)
+
+Blueprint §27, "Workflow Engine" — a module named throughout this
+project's own history (Attendance's Overtime section, Recruitment's
+Application status, every other approval-shaped feature) as "a later,
+not-yet-built module," always with the same note: build the bespoke
+version now, migrate onto a real engine once one exists. Phase 19
+closed the *other* such gap (Reports); this one is Phase 20, the
+session's second continuation past blueprint §54's own Phase 1-18 list.
+
+**Blueprint gives this module the least spec of anything built so
+far** — confirmed by reading its full text before designing anything:
+six suggested table names (`workflow_definitions`/`workflow_steps`/
+`workflow_instances`/`workflow_instance_steps`/`workflow_actions`/
+`workflow_comments`), a list of 8 processes it should support (Leave,
+Overtime, Salary Adjustment, Promotion, COE, Employee Information
+Change, Document Request, Training Request), and one line of rationale
+("multiple HR processes require approval"). No field list, no state
+diagram. Collapsed to **4 real tables**, the same "collapse redundant
+layers" judgment call as Government Rules/Payroll's own suggested-ERD
+consolidations: `workflow_actions` is redundant with
+`workflow_instance_steps` for a v1 where a step is acted on exactly
+once (the step row itself already carries who/when/what, the same
+combined-decision shape `Assessment`/`PerformanceReview` already use);
+`workflow_comments` is redundant with a single decision-comment field,
+matching how every other approval flow in this app (Leave, COE,
+Offboarding) already gets by with one reason/comments field rather than
+a discussion thread nothing has asked for.
+
+**Deliberately does *not* migrate the 6+ modules that already have
+their own bespoke approval flow** (Leave, Overtime, Attendance
+Correction Requests, Recruitment's Application pipeline, COE,
+Offboarding, PIPs). That migration is real, and each of those modules'
+own CLAUDE.md section already names it as the natural follow-up once an
+engine exists — but retrofitting several already-shipped, currently-
+working systems onto new infrastructure in the same pass this
+infrastructure is first being built is a materially larger, riskier
+undertaking than proving the engine out against one genuinely new
+feature end-to-end. That's the shape this phase takes instead: build
+the engine, and wire it to exactly one real, previously-unbuilt
+consumer — **Employee Information Change** (`EmployeeSelf-Service`'s own
+`ProfileController` doc comment has said "updating 'permitted
+information' ... isn't built yet" since Phase 13a) — closing a real,
+already-flagged gap rather than inventing a demo. See Employee
+Self-Service above for that flag; 20c closes it.
+
+**20a — Definitions + Steps, the config layer.** `WorkflowDefinition`
+(company-scoped, same shape as `LeaveType`/`PayrollGroup`: `name`,
+`process_type`, `description`, `is_active`, soft-deletable) is a named,
+reusable approval template; `process_type`
+(`App\Enums\WorkflowProcessType`, mirroring blueprint's own 8 names) is
+how a real consumer looks up "the active definition for my process at
+my company" without a fragile name match — enforced as an app-level "at
+most one" convention via `is_active`, not a DB constraint (an admin can
+have several inactive/draft definitions per process, only one live).
+`WorkflowStep` (`step_order`, `name`, `approver_type`,
+`required_permission`) names who can act on it by reusing this app's
+*existing* RBAC rather than a parallel approver-assignment system:
+`Manager` resolves to the workflow subject's own current manager (the
+same `Employment.manager_id` relation Team data scope already uses);
+`Permission` accepts anyone holding a named permission
+(`Rule::exists('permissions','name')`-validated against the real
+catalog, so a typo becomes a friendly form error, not a silently
+unusable step). Admin CRUD (`WorkflowDefinitionController` for
+definitions, `WorkflowStepController` nested underneath, steps managed
+from the definition's `show()` page via add/edit modals — the exact
+`ContributionRateTable`/bracket pattern Phase 11a already established)
+is gated by a new `workflow.view`/`workflow.manage` pair — genuinely
+new permissions, not a borrowed group, since (unlike Compensation's or
+Reports' own borrowing decisions) nothing in the seeded catalog has a
+shape that fits generic cross-module workflow configuration; granted to
+HR Administrator, the role that already owns configuring every other
+piece of company-wide process data in this app. Lights up the
+long-placeholder ADMINISTRATION > Workflows sidebar entry.
+
+**A real route-model-binding bug, caught by the test suite, not by
+inspection.** `Route::resource('definitions', WorkflowDefinitionController
+::class)` auto-generates the wildcard `{definition}` (Laravel
+singularizes the *last* URI segment only — it has no idea the
+controller's model is `WorkflowDefinition`, not `Definition`), but
+every controller method type-hinted `WorkflowDefinition $workflowDefinition`,
+matching this app's own established convention of naming the parameter
+after the full model (`ContributionRateTable $contributionRateTable`,
+`JobLevel $jobLevel` -- the latter documented in this file's own
+Organization section as *needing* Laravel's snake-casing to line up
+with a *hyphenated* resource name, a different mechanism entirely from
+this bug). Because the wildcard name (`definition`) and the method
+parameter's snake-cased name (`workflow_definition`) didn't match,
+Laravel's implicit binding silently fell through to constructing a
+**brand-new, empty, unsaved `WorkflowDefinition`** instead of either
+binding the real row or throwing a 404 -- `update()` and `destroy()`
+both "succeeded" (200/redirect, no error) while operating on a phantom
+object, leaving the real database row completely untouched. A feature
+test asserting `is_active` actually flipped after an update caught this
+immediately (the assertion failed with the value unchanged); tracing it
+required dumping the bound instance's own `id`/`exists` inside the
+controller to see it was `null`/`false` -- confirming the object itself
+was never persisted, not a validation or query bug. Fixed with an
+explicit `->parameters(['definitions' => 'workflow_definition'])` on
+the resource route (keeping the short, readable `/admin/workflow/
+definitions` URLs and `admin.workflow.definitions.*` route names,
+rather than renaming the resource to `workflow-definitions` or
+shortening every controller parameter to `$definition`), pinned down
+with dedicated regression tests. **Worth remembering generally**: a
+`Route::resource()` wildcard is derived from the *resource name given
+to the route*, not from the controller's model type -- whenever a
+resource's URI segment is shorter or different from the model it
+manages (exactly this case: `definitions` vs. `WorkflowDefinition`),
+implicit binding can silently construct an empty model instead of
+failing loudly, and nothing catches it short of asserting the actual
+persisted state after a write.
+
+**Deliberately not yet built (20b/20c)**: `WorkflowInstance`/
+`WorkflowInstanceStep` (the actual engine mechanics -- starting a
+workflow, resolving who can act on the current step, advancing/
+rejecting), a generic admin approvals inbox, and the Employee
+Information Change self-service feature that will be this engine's
+first real consumer. A `WorkflowDefinition` with steps exists today but
+nothing can start an instance against one yet -- that's 20b's job.
 
 ## Commands
 
