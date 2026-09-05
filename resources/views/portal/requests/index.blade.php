@@ -11,7 +11,7 @@
         </div>
     @else
         <h1 class="h4 mb-3">My Requests</h1>
-        <p class="text-body-secondary">All of your leave, overtime, attendance correction, and COE requests in one place.</p>
+        <p class="text-body-secondary">All of your leave, overtime, attendance correction, COE, and information change requests in one place.</p>
 
         <div class="card">
             <div class="table-responsive">

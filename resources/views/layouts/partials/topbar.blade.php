@@ -7,6 +7,13 @@
         </svg>
     </button>
 
+    {{-- Desktop-only: collapses the fixed sidebar to icons and back — see sidebar.blade.php's own top comment for why this lives here and not in the sidebar itself. --}}
+    <button class="btn btn-outline-secondary d-none d-lg-inline-flex" type="button"
+            id="sidebar-collapse-toggle" aria-controls="appSidebar" aria-pressed="false"
+            aria-label="Collapse sidebar" title="Collapse sidebar">
+        <i class="bi bi-chevron-double-left" aria-hidden="true"></i>
+    </button>
+
     <div class="flex-grow-1 fw-semibold">
         @yield('title', 'Dashboard')
     </div>

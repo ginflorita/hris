@@ -4,10 +4,12 @@
     sidebar (layouts/partials/sidebar.blade.php) -- My Payslips (Phase
     12), My Profile/Employment/Documents (13a, read-only), My
     Leave/Leave Request/My Overtime (13b, self-service submit + cancel),
-    My Attendance (13c, correction requests), Request COE (13d), and
-    Requests (13f, an aggregated view across all four request types) are
-    the real links so far; everything else (Performance/Training,
-    Announcements, Notifications) waits on modules that don't exist yet.
+    My Attendance (13c, correction requests), Request COE (13d), Requests
+    (13f, an aggregated view across all five request types), and Update
+    My Information (20c, routed through the Workflow engine rather than
+    a direct edit) are the real links so far; everything else
+    (Performance/Training, Announcements, Notifications) waits on
+    modules that don't exist yet.
 --}}
 <div class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
     <div class="offcanvas-header border-bottom">
@@ -28,6 +30,7 @@
             'MY HR' => [
                 'My Profile' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
                 'My Employment' => ['route' => 'portal.profile.show', 'active' => ['portal.profile.*']],
+                'Update My Information' => ['route' => 'portal.information-change.index', 'active' => ['portal.information-change.*']],
             ],
             'ATTENDANCE' => [
                 'My Attendance' => ['route' => 'portal.attendance.index', 'active' => ['portal.attendance.*']],

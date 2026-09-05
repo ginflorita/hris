@@ -304,6 +304,98 @@ follow-up, not a silent omission; there is no separate "not started"
 phase left to point to. Re-read the relevant phase section above (this
 file is a summary, not a substitute) before extending any area further.
 
+- Phase 19 (complete) — Reports & Analytics: blueprint §3 names eight
+  report/analytics modules (items 53-60: HR, Payroll, Attendance, Leave,
+  Recruitment, Performance, Training Reports, plus Workforce Analytics)
+  and §55's own "V1 MVP" list names Reports as item 19 of 21 — but
+  blueprint never gives Reports a numbered detail section (confirmed by
+  grep before starting: of the modules named without one, only
+  "Workflow Engine" also has none) and never assigns it to one of §54's
+  Phase 1-18 despite listing it as V1-scoped, the same "named but never
+  scheduled" gap Career Development/Succession Planning (Phase 15g)
+  turned out to be. With §54's own list already fully built, this
+  became the session's own continuation past it — numbered Phase 19 to
+  keep the same phase-lettering convention (19a, 19b, ...) every other
+  multi-slice phase used rather than leaving it unlabeled. Four slices,
+  all eight report modules: (19a) a Reports landing page and an HR
+  Report (headcount by department/employment type/status), gated by the
+  long-reserved `reports.view` permission nothing had checked until
+  now; (19b) a Payroll Report (cost/deduction/contribution/tax totals
+  per period), gated by `payroll.view` instead — payroll data gets the
+  module's own tighter permission rather than `reports.view`, unlike
+  HR's report; (19c) Recruitment (application-status funnel),
+  Performance (average rating/goal completion per cycle), and Training
+  (enrollment/completion/certificate) Reports, each likewise gated by
+  its own module's `.view` permission, reachable only from the Reports
+  landing page since blueprint's own admin nav sketch never gives them
+  a sidebar row of their own; (19d) Workforce Analytics, a glance-level
+  page combining one top-line number from each other report, closing
+  out the sidebar's REPORTS section and the landing page's eight-card
+  grid. A real cross-controller bug (19b's and 19c's period/cycle
+  pickers both non-deterministic on a tied `start_date`) was caught and
+  fixed in 19c. See Reports below.
+
+- Phase 20 (complete) — Workflow: blueprint §27 gives the least spec
+  of any module built so far (six suggested table names, a list of 8
+  processes, one line of rationale, no fields or state diagram) and,
+  like Reports before it, is never assigned to a §54 phase. This
+  session's second continuation past §54's own list. Collapsed to 4
+  real tables; deliberately does *not* migrate the 6+ modules that
+  already have their own bespoke approval flow (Leave, Overtime,
+  Recruitment, COE, Offboarding, PIPs) — building the engine and
+  proving it against one genuinely new consumer (Employee Information
+  Change, a real gap Employee Self-Service's own Phase 13a section has
+  flagged since it was written) is this phase's scope, not a mass
+  retrofit of already-working systems. (20a) `WorkflowDefinition`/
+  `WorkflowStep` — the config layer, admin CRUD, a new `workflow.view`/
+  `workflow.manage` permission pair — is done; a real
+  `Route::resource()` wildcard-vs-model-name mismatch was caught by the
+  test suite (implicit binding was silently constructing an empty,
+  unsaved model instead of binding the real row) and fixed. (20b)
+  `WorkflowInstance`/`WorkflowInstanceStep` plus
+  `App\Domain\Workflow\Services\WorkflowEngine` — starting, advancing,
+  rejecting, and cancelling a real instance, snapshotting each step at
+  start so a later definition edit can't rewrite history, Manager/
+  Permission approver resolution reusing existing RBAC and org data
+  (with a leading unresolvable Manager step auto-skipped, and an
+  all-unresolvable or zero-step instance auto-approved rather than left
+  stuck), and a generic `Admin\WorkflowInstanceController` approvals
+  inbox whose authorization is fully dynamic (no `$this->authorize()`
+  call at all) — proven end-to-end against
+  `EmployeeInformationChangeRequest`, the engine's first real subject,
+  through a real two-step manager-then-HR approval verified live in the
+  browser. A real bug (the approvals inbox never rendered its
+  `session('status')` flash) was caught by that Playwright pass, not by
+  the 24 new feature tests, and fixed. (20c)
+  `Portal\EmployeeInformationChangeController` — the actual employee-
+  facing front door onto 20a/20b, closing the gap Phase 13a's own
+  `ProfileController` doc comment flagged: a history-plus-modal-submit
+  page (the same shape `Portal\CoeRequestController` already
+  established) that looks up the company's own active
+  `EmployeeInformationChange` definition and starts a real instance
+  through it, with no `employee_id` field on the form at all — the same
+  IDOR-prevention-by-omission every other portal controller already
+  uses. Wired into the Phase 13f Requests aggregation view as a fifth
+  request type. Verified end-to-end live in the browser reusing 20b's
+  own seeded accounts: a brand-new portal-submitted request, a second
+  real manager-then-HR approval, and a database check afterward
+  confirming the employee's record updated only in the one field this
+  request actually touched. Blueprint §27 is now built end-to-end. See
+  Workflow below.
+
+- Addendum (not a blueprint phase) — a `Dockerfile`, `docker-compose.yml`
+  (plus `.env.docker-compose.example`), and two GitHub Actions
+  workflows (`docker-publish.yml`, `deploy.yml`) were added after Phase
+  20, in direct response to a question about deploying this app via
+  GitHub. Both workflows are inert until their secrets are configured.
+  Not build-verified in the authoring session — this sandbox's own
+  egress policy blocks Docker Hub — so the real verification happens
+  the first time `docker-publish.yml` runs on GitHub's own
+  infrastructure; `docker compose config` (no image pull needed) did
+  catch one real bug in the compose file, fixed the same session. See
+  the end of "Production, Backup &
+  Disaster Recovery" below and DEPLOYMENT.md for the full detail.
+
 ## Authentication
 
 Backend is Laravel Fortify (`laravel/fortify`), used **headless** — we
@@ -2493,7 +2585,7 @@ monitoring integration, and third-party penetration testing/vulnerability
 scanning — is Phase 18's job or a real deployment's own security review,
 not a gap in this phase's own scope.
 
-## Production, Backup & Disaster Recovery (Phase 18, in progress)
+## Production, Backup & Disaster Recovery (Phase 18, complete)
 
 Blueprint §54's final phase. Unlike every prior phase, most of its
 bullets (Nginx/PHP-FPM, monitoring, CI/CD, disaster recovery) describe
@@ -2818,6 +2910,725 @@ codebase up next, not a silent omission. CLAUDE.md itself, not a
 separate document, is the accounting of what's built versus what's a
 documented, deliberate gap — read the phase section for the area being
 touched before assuming either.
+
+**Addendum, added later, outside this phase's own scope**: asked
+directly whether this app could be deployed via GitHub, this session
+added a `Dockerfile` (repo root) packaging Phase 18d's same Nginx +
+PHP-FPM + Supervisor stack as one image (three roles -- web/worker/
+schedule -- selected by the container's command, config cached at
+container *start* rather than baked into the image, migrations opt-in
+via `RUN_MIGRATIONS=true` rather than automatic) plus two GitHub
+Actions workflows: `docker-publish.yml` (builds and pushes that image
+to GHCR, needing no secrets of its own) and `deploy.yml` (a manual-
+dispatch SSH runner of this file's own "Deploying an update" steps
+against an existing bare-VPS install, needing four). Both workflows are
+inert until their secrets are configured, so adding them carries no
+risk on its own. Not build-verified in the authoring session — this
+sandbox's egress policy blocks Docker Hub itself (confirmed via the
+proxy's own status endpoint as an explicit policy denial, not a
+fixable local issue), so the Dockerfile was confirmed to parse and
+stage correctly but never actually built end to end; that real
+verification happens the first time `docker-publish.yml` runs on
+GitHub's own unrestricted infrastructure. Also added:
+`docker-compose.yml` plus `.env.docker-compose.example`, so anyone
+with real Docker Hub access can exercise the actual MySQL + Redis path
+locally before trusting the image anywhere real -- structurally
+validated with `docker compose config` (needs no image pull), which
+caught a real bug on its first run: naming the target env file `.env`
+silently collided with this repo's own real local-dev `.env`
+(Compose's `env_file:` resolves that literal filename regardless of
+the unrelated `--env-file` flag used to check it), so the resolved
+config came back holding this project's SQLite-dev values instead of
+anything from the new example file. Renamed the target to
+`.env.docker-compose` and confirmed the fix by re-running the same
+check. See DEPLOYMENT.md's "Container deployment" and "Automated
+deployment via GitHub Actions" sections for the full detail this
+paragraph summarizes.
+
+**A second real bug, found while verifying the above on live GitHub
+Actions rather than only in this sandbox: `tests.yml`'s `PHP 8.3` job
+had been failing on `main` since long before this addendum, unrelated
+to anything it added.** `composer.json` declares `"php": "^8.3"` but
+never pinned `config.platform.php`, so every `composer update` run in
+this sandbox (whose actual interpreter is PHP 8.4) silently resolved
+and locked several transitive packages — `symfony/clock`,
+`css-selector`, `event-dispatcher`, `property-access`, `property-info`,
+`serializer`, `string`, `translation`, `type-info` (all pulled in via
+`web-auth/webauthn-lib`, itself a transitive dependency of `laravel/
+fortify`'s WebAuthn support), plus `web-auth/webauthn-lib` 5.3.6 itself
+— to versions requiring `php >=8.4.1`, silently drifting `composer.lock`
+past the project's own declared 8.3 floor with nothing to catch it
+locally (this sandbox never runs the CI matrix's PHP 8.3 leg). Confirmed
+pre-existing and identical on three historical `main` runs, including
+`main`'s own current HEAD at the time, via `get_job_logs` — not
+something introduced by whichever PR happened to surface it. Fixed by
+adding `"config": {"platform": {"php": "8.3.33"}}` to `composer.json`
+(pinning dependency *resolution* to the declared floor regardless of
+whichever PHP version actually runs `composer update`, so this can't
+silently drift again) and regenerating the lock: the affected Symfony
+packages downgraded to their 8.2+-compatible 7.4.x line and
+`web-auth/webauthn-lib` moved to 5.3.8, with a handful of small
+transitive version bumps composer pulled in to satisfy that graph — zero
+packages added or removed. Verified by a from-scratch `rm -rf vendor &&
+composer install --prefer-dist --no-interaction --no-progress`
+(reproducing `tests.yml`'s exact step) succeeding cleanly, plus the full
+478-test suite and Pint both still passing. Worth remembering: a
+`composer.json` `"php"` constraint alone only describes the *range* the
+app claims to support — nothing stops `composer update`, run on any
+single machine within that range, from locking transitive packages that
+only work on the *newer* end of it unless `config.platform.php` pins
+resolution to the floor.
+
+## Reports (Phase 19, complete)
+
+Blueprint §3 lists eight report/analytics modules (items 53-60: HR,
+Payroll, Attendance, Leave, Recruitment, Performance, Training Reports,
+plus Workforce Analytics) and §55's own "V1 MVP" list names Reports as
+item 19 of 21 — but, confirmed by grep before starting, blueprint never
+gives Reports a numbered detail section (only "Workflow Engine" has one
+among the modules named without a phase) and never assigns it to any of
+§54's Phase 1-18 despite listing it as V1-scoped. Blueprint's own
+V1/V2 split (§55) puts Reports in V1 and Recruitment/Performance/
+Training/Benefits/Career/Succession in V2, but this project's actual
+build order never gated on that split — Phases 14-16 built every one of
+those "V2" modules well before Reports, a "V1" item, is being built now.
+Not a correction to make retroactively, just a note that this project's
+phase order was never meant to mirror blueprint's V1/V2 grouping. With
+§54's own phase list fully built (see Status above), Phase 19 is this
+session's own continuation past it, kept in the same lettered-slice
+shape (19a, 19b, ...) every other multi-part phase already used.
+
+**19a — Reports landing page + HR Report.** `Admin\ReportController::index()`
+is the front door at `/admin/reports`, gated by `reports.view` — a
+permission seeded since `RoleAndPermissionSeeder` was first written but,
+confirmed by grep before this slice, never checked anywhere in the app
+until now, the same "permission exists, nothing's granted/checked yet"
+pattern `organization.manage` and `audit-logs.view` were before their
+own phases. It's a card grid linking to each report type; a card shows
+a real "View" link when the viewer both can reach the route and holds
+its permission, or a "Coming soon" badge otherwise (`Route::has()` +
+`can()`, the same check the sidebar itself already uses) — so the page
+degrades correctly per-viewer rather than assuming every viewer sees
+the same set.
+
+**HR Report** (`Admin\HrReportController`, `admin.reports.hr.index`) is
+new this slice: active/archived employee counts plus a company-
+filterable breakdown by department, employment type, and status. Reads
+straight through `Employee`/`Employment`/`Department` — no new tables,
+the same "query existing data" restraint every report in this app
+follows, `AttendanceReportController`/`LeaveReportController` (Phases
+8/9) included. Grouping keys off `Employee::currentEmployment` (Phase
+7's "exactly one source of truth for current" relation) with explicit
+fallback labels (`'Unassigned'` for no department, `'unassigned'`/
+`'no_current_employment'` for no current employment at all) rather than
+silently dropping employees with no current employment row from the
+breakdown entirely.
+
+**Employment type/status display reuses the existing inline transform,
+not a new `label()` method.** `EmploymentType`/`EmploymentStatus` have
+no `label()` — this app's two existing displays of these exact enums
+(`admin.employees.show`'s Overview and Employment tabs) already render
+them with `ucwords(str_replace('_', ' ', $value->value))` inline in
+Blade. The controller groups by the raw `->value` and the view applies
+that same transform, rather than introducing a third way to display an
+enum this app already has two consistent displays of — Phase 15g's
+"enum owns its display string via `label()`" call was for a case
+(`SuccessionReadiness`) where no existing convention produced correct
+output; here one already does, so matching it is more consistent than
+adding a second convention.
+
+**`AttendanceReportController`/`LeaveReportController` keep their own
+`attendance.view`/`leave.view` gates, unchanged** — both already existed
+(Phases 8/9) and are reachable from their own module's subnav; this
+slice only adds them to the sidebar's REPORTS section and this new
+landing page as a convenience, gated in both places by the same
+permission the controller itself already checks. Regating either to
+`reports.view` would have been a silent access change (narrowing it for
+Attendance Officer/whoever holds the module permission but not
+`reports.view`, or widening it the other way) that nothing asked for.
+
+**Sidebar REPORTS section** (previously five bare-string placeholders
+since Phase 2) now has four real entries — `Overview` (the landing
+page), `HR Reports`, `Attendance Reports`, `Leave Reports` — each gated
+by the same permission its own controller checks, plus `Payroll
+Reports`/`Analytics` staying disabled placeholders until 19b/19d. The
+landing page's own "Overview" row avoids reusing the literal label
+"Reports" a second time directly under the "REPORTS" section title,
+the same reasoning `Organization`'s sidebar entry doesn't say
+"Companies" even though that's the route it points at — the label names
+the concept, not the route.
+
+**Verified with Playwright against real seeded data**, logged in as a
+throwaway HR Administrator account (not Superadmin — HR Administrator
+holds `reports.view`/`leave.view` but deliberately not `attendance.view`,
+confirmed against the seeder rather than assumed, which made a real,
+correct negative case: the landing page's Attendance Reports card
+correctly showed "Coming soon" for this viewer and the sidebar entry
+was correctly disabled, not a bug): the landing page rendered all five
+cards with the right link/badge split, the HR report's three breakdown
+tables matched a hand-computed expectation across mixed seeded data
+(employees with and without a current employment row, across two
+departments), and the company filter's `onchange="this.form.submit()"`
+auto-submit correctly re-filtered the page. No console errors.
+
+**Bug caught: none in the application.** The one issue during
+verification was in the Playwright script itself — `page.click('text=View')`
+against a page with multiple "View" links didn't reliably land on the
+intended card, fixed by asserting on each link's actual `href` and
+navigating directly instead of clicking, a scripting fix, not an app
+one.
+
+**19b — Payroll Report.** `Admin\PayrollReportController`
+(`admin.reports.payroll.index`) picks one `PayrollPeriod` (defaulting to
+the most recent by `start_date`, company-filterable, any status —
+Draft/ForReview data is shown same as Finalized, just like
+`PayrollPeriodController`'s own index already does, since immutability
+is about not overwriting Finalized data, not about hiding earlier-stage
+data from `payroll.view` holders) and aggregates its `PayrollItem`s:
+total gross earnings/deductions/tax/net pay, deductions grouped by
+`PayrollItemLine.category`, government contributions grouped by agency
+(employee and employer shares separately, matching how the admin period
+detail page already shows both, unlike the payslip PDF which
+deliberately only shows the employee share), plus a small recent-periods
+table for a cross-period trend. No new tables, same "query existing
+data" restraint as 19a. A "View period detail" link hands off to the
+existing `PayrollPeriodController::show()` for the per-employee list
+rather than duplicating it here.
+
+**Gated by `payroll.view`, not `reports.view`** — the one deliberate
+departure from 19a's HR Report precedent. `reports.view` is also held
+by HR Administrator, who has no seeded access to any `payroll.*`
+permission; gating aggregate payroll cost/deduction/contribution/tax
+figures behind `reports.view` alone would hand that data to a role this
+app otherwise keeps it from everywhere else (payslip ownership checks,
+`employees.salary.view` gating on COE). Reuses the module's own
+permission instead, the same choice `AttendanceReportController`/
+`LeaveReportController` (Phases 8/9) already made for their own reports
+— `reports.view` turns out to mean "can reach the Reports area and see
+reports whose data has no more specific existing gate," not "can see
+every report."
+
+**Deduction category display reuses the same inline transform as
+19a** (`ucwords(str_replace('_', ' ', $category))`) — `PayrollItemLine
+.category` is free text set by `PayrollCalculationService`
+(`'basic_salary'`, a `CompensationItemType` value, or an adjustment's
+own category), the same raw-snake-case shape `EmploymentType`/
+`EmploymentStatus` already had in 19a, so the fix applies for the same
+reason. Caught by browser verification, not by the tests below (which
+asserted on the raw grouped value, not the rendered label) — a real
+instance of this project's own established lesson that Playwright
+passes the tests don't reach, worth a second look here specifically
+because a plain `assertViewHas()` on a controller's returned data can't
+catch a view-layer formatting gap the way actually rendering the page
+can.
+
+**Verified with Playwright against real seeded payroll data** (two
+periods, two employees each, contributions and deductions on every
+item), logged in as a throwaway Payroll Administrator account: the
+report defaulted to the more recent period, all four top-line totals
+and both breakdown tables matched hand-computed sums exactly, the
+period `<select>`'s auto-submit correctly switched periods (`Promise
+.all([waitForNavigation(), selectOption(...)])`, the same fix 17b
+established), and the period-detail link resolved to the real period.
+No console errors.
+
+**19c — Recruitment, Performance, and Training Reports.** Three more of
+blueprint §3's eight (items 57-59). Blueprint's own admin nav sketch
+(quoted at the top of this section) scaffolds only five REPORTS slots —
+no Recruitment/Performance/Training row of its own, even though §3's
+numbered list names all eight — so these three are real, fully-built
+pages reachable only from the Reports landing page's card grid, not new
+sidebar rows: the same "built, but not every built page gets its own
+sidebar entry" precedent Interviews/Assessments (14c) and Career/
+Succession (15g) already established, applied here to a whole report
+rather than a per-employee tab. Each reuses its own module's `.view`
+permission (`recruitment.view`/`performance.view`/`training.view`), the
+same "reports.view is the fallback, not the rule" reasoning 19b's
+Payroll Report established.
+
+**`Admin\RecruitmentReportController`** shows an application-status
+funnel (`ApplicationStatus::cases()` in pipeline order with zero-count
+stages included, not sorted by frequency — a funnel reads correctly
+only in process order) and a requisition-status breakdown, both
+company-filterable, plus open-postings and hired counts.
+`ApplicationStatus` already has a `label()` method (it was written with
+one from Phase 14b), so the view calls `$row['status']->label()`
+directly rather than the raw-value `ucwords(str_replace(...))` transform
+19a/19b use for enums that don't — checked per-enum before writing the
+view rather than assumed, since this app now has enums on both sides of
+that line (see 19a's own note on `EmploymentType`/`EmploymentStatus`
+lacking one).
+
+**`Admin\PerformanceReportController`** picks one `PerformanceCycle`
+(same "default to most recent, company-filterable" shape as 19b's
+period picker) and reports its review count/average rating (rated
+reviews only — a submitted-but-unrated review can't exist per 15b's own
+`submit()` guard, but a `Draft` one still can), reviews by type, and
+goal completion rate, plus a recent-cycles average-rating trend.
+
+**`Admin\TrainingReportController`** aggregates across *all* enrollments
+for the company rather than picking one session/course the way Payroll/
+Performance pick a period/cycle — training has no single "current
+period" spanning every course's sessions the way `PayrollPeriod`/
+`PerformanceCycle` do, so a company-wide snapshot (19a's HR Report
+shape) fits better here. Reports enrollment counts by status, an
+overall completion rate, certificates issued, and certificates expiring
+within 30 days — the same threshold `SendTrainingCertificateExpiration
+Reminders` (18a) already uses for its first reminder, reused here for
+consistency rather than picking a different window.
+
+**A real bug, caught only by browser verification against real
+(non-`RefreshDatabase`) data, not by the tests above.** Both
+`PayrollReportController` and `PerformanceReportController` picked their
+default period/cycle via `orderByDesc('start_date')->first()` alone; two
+periods or cycles sharing the exact same `start_date` (a real
+possibility — nothing prevents it, and the dev database already had two
+`PerformanceCycle`s dated `2026-01-01`) made that pick genuinely
+non-deterministic. `PerformanceReportTest`'s own fixtures always used
+distinct dates, so nothing in the test suite could have caught this —
+it only surfaced when Playwright loaded the real page against real data
+and the freshly-seeded verification cycle wasn't the one selected.
+Fixed by adding `orderByDesc('id')` as a tie-breaker on both controllers
+(most-recent-by-date, then most-recently-created) and pinning it down
+with a same-`start_date` regression test on each
+(`test_payroll_report_breaks_a_tied_start_date_by_the_newest_period`/
+`..._cycle`) rather than trusting the fix without one.
+
+**Verified with Playwright against real seeded data** across all three
+new pages plus the landing page's now-eight-card grid, logged in as a
+throwaway account granted `recruitment.view`/`performance.view`/
+`training.view`/`reports.view` directly (not through a seeded role): the
+Recruitment funnel and requisition counts, Performance's review/goal
+figures (re-verified correct immediately after the tie-break fix, not
+just the fix compiling), and Training's completion rate/certificate
+counts all matched hand-computed expectations against the seeded
+fixtures, and the landing page correctly showed "Coming soon" for
+Attendance/Leave/Payroll (this account genuinely lacks those three
+permissions) alongside real links for the other four. No console
+errors.
+
+**19d — Workforce Analytics, closing Phase 19.** Blueprint §3 item 60,
+and the fifth and last of the REPORTS slots blueprint's own admin nav
+sketch scaffolds — the one this whole section's sidebar/landing-page
+placeholder has been called "Analytics" since Phase 2. Deliberately a
+single glance-level page, not an eighth detailed report:
+`Admin\AnalyticsReportController` puts one top-line number from each of
+the other reports side by side (active employees, open postings,
+pending requisitions, pending leave requests, pending overtime
+requests, average performance rating, training completion rate) —
+Analytics' whole value is the side-by-side view, not a new breakdown,
+so it deliberately doesn't re-derive anything 19a-19c's controllers
+don't already compute in more detail.
+
+**No payroll cost tile, on purpose.** "Workforce" analytics stays
+headcount/people metrics — every number here is visible to anyone
+holding `reports.view` alone (the same permission this page is gated
+by, matching 19a's HR Report rather than 19b's `payroll.view`), and
+19b already established why aggregate payroll figures need the
+tighter gate `reports.view` alone doesn't provide. This page has no
+per-tile permission mechanism (unlike the landing page's per-card
+`Route::has()`/`can()` check), so adding one payroll-cost tile would
+mean either loosening every `reports.view` holder's access to payroll
+data or building a second gating mechanism this one page doesn't
+otherwise need — a real, sized follow-up if a future slice wants it,
+not silently deferred.
+
+**Sidebar REPORTS section is now fully real** — all five items
+(`Overview`, `HR Reports`, `Attendance Reports`, `Leave Reports`,
+`Payroll Reports`, plus this slice's `Analytics`) point at working
+pages, closing out the placeholder set Phase 2 first scaffolded. The
+landing page's card grid is now a genuine eight-card front door to
+every blueprint §3 report module (53-60), each card independently
+showing "View" or "Coming soon" per the viewer's own permissions.
+
+**Verified with Playwright against real seeded data**, logged in as a
+throwaway account granted only `reports.view` (no module-specific
+permission at all): the landing page correctly showed exactly two real
+links (HR Reports and Analytics, the only two cards gated by
+`reports.view` alone) against six "Coming soon" badges, the sidebar's
+Analytics entry was enabled with the correct href, and all seven tiles
+on the Analytics page matched hand-computed sums against seeded
+leave/overtime/requisition/posting/review/enrollment fixtures. No
+console errors.
+
+**Bug caught: none in the application this slice** — the one real bug
+this whole phase found (19b/19c's tied-`start_date` non-determinism)
+was already fixed in 19c; nothing new surfaced writing the aggregate
+queries here, likely because every query this slice needed was a
+simpler version of one 19a-19c had already exercised and gotten
+right.
+
+Blueprint §3's eight report/analytics modules (items 53-60: HR,
+Payroll, Attendance, Leave, Recruitment, Performance, Training
+Reports, Workforce Analytics) are now built end-to-end across
+19a-19d — the first phase this session added past blueprint §54's own
+Phase 1-18 list, closing the "named in §3/§55 but never scheduled" gap
+that started this phase. Every report reuses existing data with no new
+tables, and every permission choice (`reports.view` as the shared
+fallback; a module's own tighter `.view` permission — `attendance.view`/
+`leave.view`/`payroll.view`/`recruitment.view`/`performance.view`/
+`training.view` — wherever one already existed and the data was
+sensitive enough to warrant it) is documented above per-slice rather
+than applied as one blanket rule.
+
+## Workflow (Phase 20, complete)
+
+Blueprint §27, "Workflow Engine" — a module named throughout this
+project's own history (Attendance's Overtime section, Recruitment's
+Application status, every other approval-shaped feature) as "a later,
+not-yet-built module," always with the same note: build the bespoke
+version now, migrate onto a real engine once one exists. Phase 19
+closed the *other* such gap (Reports); this one is Phase 20, the
+session's second continuation past blueprint §54's own Phase 1-18 list.
+
+**Blueprint gives this module the least spec of anything built so
+far** — confirmed by reading its full text before designing anything:
+six suggested table names (`workflow_definitions`/`workflow_steps`/
+`workflow_instances`/`workflow_instance_steps`/`workflow_actions`/
+`workflow_comments`), a list of 8 processes it should support (Leave,
+Overtime, Salary Adjustment, Promotion, COE, Employee Information
+Change, Document Request, Training Request), and one line of rationale
+("multiple HR processes require approval"). No field list, no state
+diagram. Collapsed to **4 real tables**, the same "collapse redundant
+layers" judgment call as Government Rules/Payroll's own suggested-ERD
+consolidations: `workflow_actions` is redundant with
+`workflow_instance_steps` for a v1 where a step is acted on exactly
+once (the step row itself already carries who/when/what, the same
+combined-decision shape `Assessment`/`PerformanceReview` already use);
+`workflow_comments` is redundant with a single decision-comment field,
+matching how every other approval flow in this app (Leave, COE,
+Offboarding) already gets by with one reason/comments field rather than
+a discussion thread nothing has asked for.
+
+**Deliberately does *not* migrate the 6+ modules that already have
+their own bespoke approval flow** (Leave, Overtime, Attendance
+Correction Requests, Recruitment's Application pipeline, COE,
+Offboarding, PIPs). That migration is real, and each of those modules'
+own CLAUDE.md section already names it as the natural follow-up once an
+engine exists — but retrofitting several already-shipped, currently-
+working systems onto new infrastructure in the same pass this
+infrastructure is first being built is a materially larger, riskier
+undertaking than proving the engine out against one genuinely new
+feature end-to-end. That's the shape this phase takes instead: build
+the engine, and wire it to exactly one real, previously-unbuilt
+consumer — **Employee Information Change** (`EmployeeSelf-Service`'s own
+`ProfileController` doc comment has said "updating 'permitted
+information' ... isn't built yet" since Phase 13a) — closing a real,
+already-flagged gap rather than inventing a demo. See Employee
+Self-Service above for that flag; 20c closes it.
+
+**20a — Definitions + Steps, the config layer.** `WorkflowDefinition`
+(company-scoped, same shape as `LeaveType`/`PayrollGroup`: `name`,
+`process_type`, `description`, `is_active`, soft-deletable) is a named,
+reusable approval template; `process_type`
+(`App\Enums\WorkflowProcessType`, mirroring blueprint's own 8 names) is
+how a real consumer looks up "the active definition for my process at
+my company" without a fragile name match — enforced as an app-level "at
+most one" convention via `is_active`, not a DB constraint (an admin can
+have several inactive/draft definitions per process, only one live).
+`WorkflowStep` (`step_order`, `name`, `approver_type`,
+`required_permission`) names who can act on it by reusing this app's
+*existing* RBAC rather than a parallel approver-assignment system:
+`Manager` resolves to the workflow subject's own current manager (the
+same `Employment.manager_id` relation Team data scope already uses);
+`Permission` accepts anyone holding a named permission
+(`Rule::exists('permissions','name')`-validated against the real
+catalog, so a typo becomes a friendly form error, not a silently
+unusable step). Admin CRUD (`WorkflowDefinitionController` for
+definitions, `WorkflowStepController` nested underneath, steps managed
+from the definition's `show()` page via add/edit modals — the exact
+`ContributionRateTable`/bracket pattern Phase 11a already established)
+is gated by a new `workflow.view`/`workflow.manage` pair — genuinely
+new permissions, not a borrowed group, since (unlike Compensation's or
+Reports' own borrowing decisions) nothing in the seeded catalog has a
+shape that fits generic cross-module workflow configuration; granted to
+HR Administrator, the role that already owns configuring every other
+piece of company-wide process data in this app. Lights up the
+long-placeholder ADMINISTRATION > Workflows sidebar entry.
+
+**A real route-model-binding bug, caught by the test suite, not by
+inspection.** `Route::resource('definitions', WorkflowDefinitionController
+::class)` auto-generates the wildcard `{definition}` (Laravel
+singularizes the *last* URI segment only — it has no idea the
+controller's model is `WorkflowDefinition`, not `Definition`), but
+every controller method type-hinted `WorkflowDefinition $workflowDefinition`,
+matching this app's own established convention of naming the parameter
+after the full model (`ContributionRateTable $contributionRateTable`,
+`JobLevel $jobLevel` -- the latter documented in this file's own
+Organization section as *needing* Laravel's snake-casing to line up
+with a *hyphenated* resource name, a different mechanism entirely from
+this bug). Because the wildcard name (`definition`) and the method
+parameter's snake-cased name (`workflow_definition`) didn't match,
+Laravel's implicit binding silently fell through to constructing a
+**brand-new, empty, unsaved `WorkflowDefinition`** instead of either
+binding the real row or throwing a 404 -- `update()` and `destroy()`
+both "succeeded" (200/redirect, no error) while operating on a phantom
+object, leaving the real database row completely untouched. A feature
+test asserting `is_active` actually flipped after an update caught this
+immediately (the assertion failed with the value unchanged); tracing it
+required dumping the bound instance's own `id`/`exists` inside the
+controller to see it was `null`/`false` -- confirming the object itself
+was never persisted, not a validation or query bug. Fixed with an
+explicit `->parameters(['definitions' => 'workflow_definition'])` on
+the resource route (keeping the short, readable `/admin/workflow/
+definitions` URLs and `admin.workflow.definitions.*` route names,
+rather than renaming the resource to `workflow-definitions` or
+shortening every controller parameter to `$definition`), pinned down
+with dedicated regression tests. **Worth remembering generally**: a
+`Route::resource()` wildcard is derived from the *resource name given
+to the route*, not from the controller's model type -- whenever a
+resource's URI segment is shorter or different from the model it
+manages (exactly this case: `definitions` vs. `WorkflowDefinition`),
+implicit binding can silently construct an empty model instead of
+failing loudly, and nothing catches it short of asserting the actual
+persisted state after a write.
+
+**20b -- Instances + the engine itself.** `WorkflowInstance` (one row
+per real request: `workflow_definition_id`, `company_id`, a polymorphic
+`subject_type`/`subject_id`, `initiated_by` nullable, `status`,
+`current_step_order` nullable, `completed_at`) and
+`WorkflowInstanceStep` (that instance's per-step progress) are where a
+definition actually gets *run*. `App\Domain\Workflow\Services\
+WorkflowEngine` is the one place instances are started and advanced --
+`Admin\WorkflowInstanceController` only resolves the instance/current
+step and calls into it, the same "payroll logic never lives in
+controllers" discipline applied to a new domain.
+
+**Snapshot at start, not a live read through `workflow_step_id`.**
+`start()` copies each `WorkflowStep`'s `name`/`approver_type`/
+`required_permission` onto the new `WorkflowInstanceStep` row at the
+moment the instance begins; `workflow_step_id` is kept only as a soft
+backreference. Editing a step's approver after instances already exist
+against its definition (a real scenario -- an admin can always edit an
+active definition) must not silently change what an in-flight or
+historical approval meant, the same principle `CoeRequest`'s snapshot
+columns established for Employment data in 13d. Proven by a dedicated
+test (`test_starting_an_instance_snapshots_steps_from_the_definition_at
+_creation_time`) that mutates the live `WorkflowStep` after starting an
+instance and asserts the already-created `WorkflowInstanceStep` is
+unaffected.
+
+**Approver resolution reuses this app's existing RBAC and org data --
+no parallel approver-assignment system.** `WorkflowApproverType::Manager`
+resolves via the subject's `HasWorkflowSubjectEmployee::workflowEmployee()`
+-> `currentEmployment` -> `manager` -> that manager's linked `User`
+(the exact chain Team data scope already uses); `::Permission` is
+`$user->can($step->required_permission)` against the real permission
+catalog. A leading `Manager` step with no resolvable manager (no
+current employment, or a manager with no linked account) is
+auto-skipped rather than left stuck forever --
+`advancePastUnresolvableManagerSteps()` walks forward marking each such
+step `Skipped` until it lands on a real actionable step or runs out; if
+*every* step turns out unresolvable (or a definition has zero steps at
+all -- the `start()`-time check for that exact case), the instance is
+auto-approved outright, the same "nothing left to block on" reasoning
+`EmployeeOnboarding` already applies to a zero-task checklist. Both
+paths call `applyWorkflowApproval()` on the subject, if it implements
+`AppliesOnWorkflowApproval` -- an approval that happened to need zero
+human decisions still has to apply.
+
+**Two small contracts, not a base class, are what a subject implements
+to plug into the engine**: `HasWorkflowSubjectEmployee` (whose employee
+is this about, for manager resolution) and `AppliesOnWorkflowApproval`
+(what to actually change when every step clears). `subject_type`/
+`subject_id` store the plain class name, no morph map -- the same
+convention `audit_logs.auditable_type` already established.
+
+**`EmployeeInformationChangeRequest` is the engine's first real
+subject** -- a small, deliberately restrained set of self-service-
+editable bio fields (`requested_mobile`/`requested_email`/
+`requested_civil_status`/`requested_nationality`; not name/employee
+number, which are identity fields with their own integrity concerns,
+and not address/emergency contact, which already have their own
+sub-resources). Explicit `requested_*` columns rather than a JSON diff
+blob, matching `AttendanceCorrectionRequest`'s own shape. **No status
+column at all** -- unlike `AttendanceCorrectionRequest`, which predates
+this engine and owns its status outright, this table's entire lifecycle
+lives on its `WorkflowInstance` via the polymorphic `subject` relation,
+the whole point of building this as the engine's first consumer rather
+than another bespoke table. `applyWorkflowApproval()` writes only the
+non-null requested fields onto the `Employee` row (`array_filter(...,
+fn ($v) => $v !== null)`) -- a request that only proposed a mobile
+change must not blank out email/civil status/nationality.
+
+**`Admin\WorkflowInstanceController` has no `$this->authorize()` call
+anywhere in it -- a genuinely different authorization shape from every
+other admin controller in this app.** "Who can act" is dynamic per
+step, not a static permission, so there's no single check that would
+mean the right thing. `index()` is a personal inbox
+(`WorkflowEngine::pendingStepsFor($user)`, itself filtered to steps
+that are both the instance's *current* step and pass `canAct()` --
+proven by a test that confirms a later step's permission-holder sees
+nothing until the earlier step actually clears, not just "any pending
+step naming their permission somewhere in the instance"). `show()`
+gates on `canAct() || hasActed` (already having decided this instance's
+own history stays visible after the fact, just without action buttons
+-- proven by `test_show_remains_visible_after_acting_but_without_action
+_buttons`), a 403 otherwise. `pendingStepsFor()` queries globally, not
+company-scoped, matching this app's already-documented admission that
+Company-level data scope is unenforced everywhere else too.
+
+**A real bug, caught by Playwright, not by the test suite**:
+`instances/index.blade.php` never rendered a `session('status')` alert
+block. Every other custom (non-`<x-admin.resource-index>`) list/show
+page in this app has needed this reminder at least once (15e's course
+show page, 17b's audit log index) -- this is the same class of bug
+again, just on an index page instead of a show page this time. The
+approve/reject actions themselves worked correctly throughout (proven
+by the feature test suite, which asserts against `session('status')`
+directly rather than rendering it), so nothing in the test suite could
+have caught a purely view-layer omission -- only actually loading the
+page after approving, the way a real HR reviewer would, surfaced it.
+Fixed by adding the same `@session('status')`/`$errors->any()` block
+`admin.employees.show` established, verbatim.
+
+**Verified with Playwright against a real two-step flow, not a
+synthetic single-step demo.** Seeded a company with a manager/report
+pair and an HR-permission holder, a definition with a `Manager` step
+followed by a `Permission` step, and a real
+`EmployeeInformationChangeRequest` proposing a mobile and email change;
+started the instance via the engine directly (there's no self-service
+UI yet -- that's 20c). Logged in as the manager: the inbox correctly
+showed the request, the show page correctly rendered the requested-vs-
+current diff card (`_employee-information-change-subject.blade.php`)
+and the reason text, approving redirected to the inbox with the flash
+message now visible and the request gone from the manager's own list.
+Logged in as the HR holder next: the inbox now correctly showed the
+*same* request (advanced to the `HR Approval` step), the step timeline
+correctly showed the manager's step as `Approved`, and approving
+completed the instance. Confirmed directly against the database
+afterward (not just the rendered page): `status=approved`,
+`completed_at` set, and -- proving `applyWorkflowApproval()` actually
+fired through the real HTTP path, not just in an isolated test --
+the employee's `mobile`/`email` columns held the *requested* values.
+Zero browser console errors across the whole flow.
+
+**Test coverage**: 24 new tests -- including one on the 20a suite,
+`test_a_definition_with_instance_history_cannot_be_deleted`, pinning
+down `WorkflowDefinitionController::destroy()`'s guard against deleting
+a definition with any instance history (added this slice, once
+`instances()` existed to check), the asymmetric counterpart to 20a's
+already-documented "a step needs no such guard, snapshotting already
+protects it" decision. `WorkflowEngineTest`
+(`tests/Feature/Domain/Workflow/`) calls `WorkflowEngine` directly, the
+same "invoke the domain service via `app()`" convention `LeaveTest`/
+`PayrollAdjustmentTest` already use for `LeaveBalanceService`/
+`PayrollCalculationService` -- covering snapshotting, both
+manager-resolution paths (auto-skip, all-unresolvable-auto-approves),
+multi-step progression with the approval callback only firing on final
+approval (not mid-flow), rejection terminality plus cascade-`Skipped`
+of every remaining pending step, `pendingStepsFor`'s current-step-only
+filtering, and every `abort_unless` guard in `act()`/`cancel()`
+including one (a step already decided while still nominally "current")
+that can't happen through normal engine-driven flow at all and had to
+be simulated directly, the same kind of defensive-guard-only-reachable-
+by-simulation situation as a concurrent double-submit.
+`WorkflowInstanceControllerTest` (`tests/Feature/Admin/Workflow/`)
+covers the HTTP layer: the inbox's dynamic filtering, `show`'s
+`canAct||hasActed` gate in both directions, approve/reject end to end,
+reject's required-`comments` validation, and the 422 a stale approve
+click produces once nothing is left to act on.
+
+**20c -- Employee Information Change self-service, closing Phase 20.**
+`Portal\EmployeeInformationChangeController` is the actual employee-
+facing front door onto everything 20a/20b built -- the exact "real,
+already-flagged gap" the top of this section named as this phase's
+whole reason for existing (`Portal\ProfileController`'s own doc comment
+had said "isn't built yet" since Phase 13a). Same shape as
+`Portal\CoeRequestController`: one page (`index()`) combining a history
+table with a modal submit form, no separate create/index split. `store()`
+hard-codes `employee_id`/`company_id` from the authenticated user's own
+`employee` -- there is no such input field on the form at all, the same
+IDOR-prevention-by-omission Phase 13b's portal Leave/Overtime
+controllers already established, not a check that could be bypassed so
+much as a field that was never accepted in the first place.
+
+**Looks up the company's active `EmployeeInformationChange`
+`WorkflowDefinition` itself -- there's no admin step that hands a
+portal controller "the" definition to use.** `activeDefinitionFor()`
+queries `company_id` + `process_type` + `is_active`, the exact lookup
+20a's own docblock said this design was *for* ("how a real consumer
+looks up 'the active definition for my process at my company' without
+a fragile name match"). No definition configured is a real, reachable
+state (a fresh company, or HR hasn't gotten to it yet) -- handled at
+both layers: the view hides the "Request a Change" button and shows a
+plain "contact HR" notice (`definitionAvailable`, the same view-level
+guard shape `Portal\ProfileController` already uses for an unlinked
+account), and `store()` itself still aborts 422 if reached directly,
+the defense-in-depth backend half of a check whose primary UX guard is
+the view.
+
+**Submitting a change validates "at least one field actually changed"
+as a real, redirect-back-with-errors case (not a raw abort)** --
+reachable through completely normal use (a reason with nothing
+selected to change), unlike the "no definition" abort above, which
+Superadmin/HR misconfiguration aside, isn't something a correctly-
+functioning UI should ever let a user reach. Nothing on the `Employee`
+row changes at submission regardless -- that's the whole point of
+routing this through the engine instead of a direct `update()`, pinned
+down by a test that submits a change and asserts the employee's own
+column is still the *old* value immediately afterward.
+
+**`Portal\RequestController`'s aggregation view (13f) gained a fifth
+request type**, `informationChangeRequests` (a new `Employee::
+informationChangeRequests()` relation, the same shape as
+`coeRequests()`/`leaveRequests()`), read status through the polymorphic
+`workflowInstance` relation rather than a status column of its own --
+consistent with 20b's own "no status column at all" design for this
+model. `RequestAggregationTest`'s existing "all four request types"
+test became "all five."
+
+**A small, pre-existing display inconsistency, caught while building
+this slice's own view, fixed in 20b's file too.** 20b's admin diff
+partial (`_employee-information-change-subject.blade.php`) rendered
+`CivilStatus` values raw (`married`) instead of this app's own
+established `ucfirst($case->value)` convention (`Married`) --
+`portal/profile/show.blade.php` and `admin/employees/show/_overview
+.blade.php` both already display the same enum this way. Not a new bug
+introduced this slice, but a real one only noticed because building
+this slice's own select-options dropdown required looking up how
+`CivilStatus` is displayed elsewhere first; fixed in both the new
+portal form and the 20b partial it was first caught in, rather than
+leaving the older file inconsistent with the new one.
+
+**Verified end-to-end in the browser against the real 20b verification
+data, not fresh fixtures** -- logged in as the same "Eddie Employee"
+account 20b's own Playwright pass used, submitted a second, genuinely
+new information-change request (this time a civil status change)
+through the real portal form for the first time (20b's original request
+had been created via `tinker`, since the portal UI didn't exist yet).
+Confirmed: the sidebar's new "Update My Information" link, the request
+button correctly gated on `definitionAvailable`, the prior (already-
+approved) request still visible in history, the new submission's flash
+message and "In Progress" status, and the same request surfacing on the
+Requests aggregation page. Then repeated 20b's manager-then-HR approval
+flow against this new instance from the admin side, and confirmed back
+on the portal page afterward: both requests now show "Approved," and --
+ground-truthed directly against the database, not just the rendered
+page -- the employee's `civil_status` column now reads `married` while
+`mobile` (never part of *this* request) stayed untouched, proving
+`applyWorkflowApproval()`'s non-null-only field filter really is
+scoped per-request, not a blanket sync. Zero console errors throughout.
+
+**Test coverage**: 9 new tests (`tests/Feature/Portal/
+EmployeeInformationChangeTest.php` plus the extended
+`RequestAggregationTest`) covering the unlinked-account message, the
+button/notice split on whether a definition exists, a successful
+submission's full effect (request created, instance started, employee
+record *not* yet touched), the at-least-one-field validation, the
+backend 422 guard when no definition exists, and the history view
+showing a submitted request's status. 478 tests passing repo-wide.
+
+Blueprint §27 (Workflow Engine) is now built end-to-end across 20a-20c:
+a reusable, generic approval engine (not a sixth bespoke flow) proven
+against a real, previously-flagged self-service gap, from admin
+configuration through to an employee actually using it and an HR
+approval actually changing their record. The 6+ already-shipped bespoke
+approval flows this phase deliberately didn't migrate (see this
+section's own opening) remain exactly that -- a real, sized follow-up
+for whenever migrating one of them is worth more than the risk of
+touching an already-working system, not a gap in this phase's own
+scope.
 
 ## Commands
 

@@ -45,6 +45,7 @@ class RoleAndPermissionSeeder extends Seeder
         'benefits' => ['view', 'manage'],
         'reports' => ['view'],
         'audit-logs' => ['view'],
+        'workflow' => ['view', 'manage'],
     ];
 
     /**
@@ -59,6 +60,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'leave.view', 'leave.approve', 'leave.reject',
                 'benefits.view',
                 'reports.view',
+                'workflow.view', 'workflow.manage',
             ],
         ],
         'HR Staff' => [

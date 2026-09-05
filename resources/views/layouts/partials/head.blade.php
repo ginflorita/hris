@@ -4,7 +4,7 @@
 
 <title>@yield('title', 'Dashboard') · {{ config('app.name') }}</title>
 
-{{-- Set the theme before first paint to avoid a flash of the wrong mode. --}}
+{{-- Set the theme and sidebar collapse state before first paint, to avoid a flash of the wrong mode/width. --}}
 <script>
     (() => {
         const stored = localStorage.getItem('theme');
@@ -12,6 +12,8 @@
             ? stored
             : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.setAttribute('data-bs-theme', theme);
+
+        document.documentElement.setAttribute('data-sidebar', localStorage.getItem('sidebar-collapsed') === 'true' ? 'collapsed' : 'expanded');
     })();
 </script>
 

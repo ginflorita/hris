@@ -48,37 +48,50 @@ vendor/bin/pint       # format code
 vendor/bin/pint --test  # check formatting without changing files
 ```
 
+## Deployment
+
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full walkthrough,
+including disaster recovery. Two supported paths, pick whichever
+matches the target host — a bare server, or anywhere that runs
+containers:
+
+- **Bare server** (Nginx + PHP-FPM + Supervisor): configs in
+  [`deploy/`](deploy/); `.github/workflows/deploy.yml` can run an
+  update over SSH from a manual GitHub Actions trigger.
+- **Container**: the root [`Dockerfile`](Dockerfile) builds one image
+  (web/worker/scheduler roles, selected by command);
+  `.github/workflows/docker-publish.yml` builds and pushes it to GHCR
+  automatically. [`docker-compose.yml`](docker-compose.yml) runs the
+  same image against real MySQL + Redis containers for local testing —
+  copy [`.env.docker-compose.example`](.env.docker-compose.example) to
+  `.env.docker-compose` first.
+
+MySQL 8+ and Redis are always separate services in either path, never
+bundled into the app itself.
+
 ## Project status
 
-Phase 1 (project foundation), part of Phase 2 (UI shell), Phase 3
-(authentication — login, 2FA, password reset, sessions), Phase 4
-(RBAC — roles, permissions, Superadmin protection, user management),
-Phase 5 (Organization — company/division/department/section/team
-hierarchy, positions, job levels/grades, cost centers), Phase 6
-(Employee Core HR — employee master data, addresses, contacts, emergency
-contacts, government IDs, dependents, documents, notes), Phase 7
-(Employee Lifecycle — an append-only Employment History covering hire,
-promotion, transfer, salary changes, regularization, and separation),
-Phase 8 (Attendance & Scheduling — holidays, shifts, schedules,
-daily attendance with audit-logged corrections, overtime approval, and
-an attendance summary report), Phase 9 (Leave Management — leave
-types/policies, an audit-ledger balance system, and leave requests with
-submit/approve/reject/cancel), Phase 10 (Compensation — salary
-structures/grades, allowances/bonuses/incentives), Phase 11 (Payroll
-Engine — versioned government contribution/tax rate tables, payroll
-groups/periods, a calculation engine producing per-employee payroll
-items with earnings/contributions/tax, and manual adjustments with
-validation flags), Phase 12 (Payroll Approval & Digital Payslip —
-review/approve/finalize/lock/publish, a downloadable payslip PDF, and a
-minimal employee portal for viewing/downloading published payslips with
-access logging and an email notification), and part of Phase 13
-(Employee & Manager Self-Service — a read-only "My Profile" in the
-portal: bio overview, employment history, documents) are in place — see
-the dashboard's build-status panel or `CLAUDE.md` for what's done and
-what's next. The
-system is built in phases per
-[`docs/HRIS_Blueprint.md` §54](docs/HRIS_Blueprint.md#54-development-phases);
-modules are not built out of order.
+All of blueprint [§54](docs/HRIS_Blueprint.md#54-development-phases)'s
+18 phases are complete, plus two later additions this project's own
+history documents in full (`CLAUDE.md`) but blueprint never scheduled:
+
+| Phases | Covers |
+|---|---|
+| 1–2 | Project foundation, admin UI shell |
+| 3–4 | Authentication (2FA, sessions) and RBAC |
+| 5–7 | Organization hierarchy, Employee core HR, Employment history |
+| 8–10 | Attendance & scheduling, Leave management, Compensation |
+| 11–12 | Payroll engine through approval, finalization, and digital payslips |
+| 13 | Employee & Manager Self-Service portal |
+| 14–16 | Recruitment & Onboarding, Talent Management, Benefits & Offboarding |
+| 17–18 | Security Hardening & OWASP verification, Production/Backup/DR |
+| 19 | Reports & Analytics (named in blueprint §3, never assigned a phase) |
+| 20 | Workflow Engine (named in blueprint §27, never assigned a phase) |
+
+Every deliberate, documented gap along the way (things intentionally
+*not* built, and why) is named in its own section of `CLAUDE.md` — that
+file, not this one, is the authoritative accounting of what's done
+versus what's a real, sized follow-up.
 
 ## License
 
