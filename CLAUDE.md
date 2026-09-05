@@ -383,6 +383,16 @@ file is a summary, not a substitute) before extending any area further.
   request actually touched. Blueprint §27 is now built end-to-end. See
   Workflow below.
 
+- Addendum (not a blueprint phase) — a `Dockerfile` and two GitHub
+  Actions workflows (`docker-publish.yml`, `deploy.yml`) were added
+  after Phase 20, in direct response to a question about deploying
+  this app via GitHub. Both workflows are inert until their secrets are
+  configured. Not build-verified in the authoring session — this
+  sandbox's own egress policy blocks Docker Hub — so the real
+  verification happens the first time `docker-publish.yml` runs on
+  GitHub's own infrastructure. See the end of "Production, Backup &
+  Disaster Recovery" below and DEPLOYMENT.md for the full detail.
+
 ## Authentication
 
 Backend is Laravel Fortify (`laravel/fortify`), used **headless** — we
@@ -2897,6 +2907,28 @@ codebase up next, not a silent omission. CLAUDE.md itself, not a
 separate document, is the accounting of what's built versus what's a
 documented, deliberate gap — read the phase section for the area being
 touched before assuming either.
+
+**Addendum, added later, outside this phase's own scope**: asked
+directly whether this app could be deployed via GitHub, this session
+added a `Dockerfile` (repo root) packaging Phase 18d's same Nginx +
+PHP-FPM + Supervisor stack as one image (three roles -- web/worker/
+schedule -- selected by the container's command, config cached at
+container *start* rather than baked into the image, migrations opt-in
+via `RUN_MIGRATIONS=true` rather than automatic) plus two GitHub
+Actions workflows: `docker-publish.yml` (builds and pushes that image
+to GHCR, needing no secrets of its own) and `deploy.yml` (a manual-
+dispatch SSH runner of this file's own "Deploying an update" steps
+against an existing bare-VPS install, needing four). Both workflows are
+inert until their secrets are configured, so adding them carries no
+risk on its own. Not build-verified in the authoring session — this
+sandbox's egress policy blocks Docker Hub itself (confirmed via the
+proxy's own status endpoint as an explicit policy denial, not a
+fixable local issue), so the Dockerfile was confirmed to parse and
+stage correctly but never actually built end to end; that real
+verification happens the first time `docker-publish.yml` runs on
+GitHub's own unrestricted infrastructure. See DEPLOYMENT.md's
+"Container deployment" and "Automated deployment via GitHub Actions"
+sections for the full detail this paragraph summarizes.
 
 ## Reports (Phase 19, complete)
 

@@ -1,0 +1,97 @@
+name: Deploy (SSH)
+
+# Manual-only on purpose -- this workflow does nothing unless someone
+# clicks "Run workflow" AND the four secrets below are set on this
+# repo, so creating it is safe even before either is true. Runs exactly
+# DEPLOYMENT.md's "Deploying an update" steps against an existing
+# bare-VPS install (see deploy/nginx, deploy/php-fpm,
+# deploy/supervisor) -- this is the alternative to the Docker/GHCR path
+# in docker-publish.yml, not a replacement for it; pick whichever
+# matches how the target host is actually provisioned.
+#
+# Required repository secrets:
+#   DEPLOY_HOST     - the server's hostname or IP
+#   DEPLOY_USER     - the unprivileged `hris` deploy user (see
+#                     DEPLOYMENT.md's "Initial deployment" step 1)
+#   DEPLOY_SSH_KEY  - private key for DEPLOY_USER, authorized on that
+#                     host (private key material -- never echo it,
+#                     never log the raw secret)
+# Optional:
+#   DEPLOY_PORT     - SSH port, defaults to 22
+#   DEPLOY_PATH     - defaults to /var/www/hris (DEPLOYMENT.md's own
+#                     example path)
+#
+# DEPLOY_REF/DEPLOY_TARGET_PATH below are passed as real shell
+# environment variables (appleboy/ssh-action's own `envs:` mechanism),
+# not spliced as literal text into the script -- the manually-typed
+# `ref` input still only reaches trusted maintainers via
+# workflow_dispatch, but quoting it as a real shell variable rather
+# than a templated string is the safer habit regardless of who can
+# currently trigger this.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (branch, tag, or commit)'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_REF: ${{ inputs.ref }}
+      DEPLOY_TARGET_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/hris' }}
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          envs: DEPLOY_REF,DEPLOY_TARGET_PATH
+          script: |
+            set -e
+            cd "$DEPLOY_TARGET_PATH"
+
+            # --detach handles a branch, tag, or bare commit SHA
+            # identically -- no need to special-case which kind of ref
+            # this deploy is targeting.
+            git fetch --all --tags --force
+            git checkout --detach "$DEPLOY_REF"
+
+            composer install --no-dev --optimize-autoloader --no-interaction
+            npm ci
+            npm run build
+
+            php artisan migrate --force
+
+            php artisan config:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            sudo supervisorctl restart hris-worker:*
+
+      - name: Smoke check
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            # -k: checking loopback directly, bypassing DNS/public
+            # routing and cert-hostname matching entirely -- this only
+            # confirms Nginx+PHP-FPM came back up after the restart
+            # above, it is not a certificate/security check.
+            code=$(curl -ks -o /dev/null -w '%{http_code}' https://127.0.0.1/login)
+            echo "login page responded: $code"
+            echo "$code" | grep -qE '^(200|302)$'
