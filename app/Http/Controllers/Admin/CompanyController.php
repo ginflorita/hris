@@ -20,13 +20,6 @@ class CompanyController extends Controller
         ]);
     }
 
-    public function create(): View
-    {
-        $this->authorize('organization.manage');
-
-        return view('admin.organization.companies.create');
-    }
-
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('organization.manage');
@@ -34,13 +27,6 @@ class CompanyController extends Controller
         Company::create($this->validated($request));
 
         return redirect()->route('admin.organization.companies.index')->with('status', 'Company created.');
-    }
-
-    public function edit(Company $company): View
-    {
-        $this->authorize('organization.manage');
-
-        return view('admin.organization.companies.edit', ['company' => $company]);
     }
 
     public function update(Request $request, Company $company): RedirectResponse

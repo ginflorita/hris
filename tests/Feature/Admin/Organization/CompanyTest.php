@@ -88,13 +88,12 @@ class CompanyTest extends TestCase
         $this->assertSoftDeleted($company);
     }
 
-    public function test_view_only_permission_allows_index_but_not_create(): void
+    public function test_view_only_permission_allows_index_but_not_manage(): void
     {
         $user = User::factory()->create();
         $user->givePermissionTo('organization.view');
 
         $this->actingAs($user)->get(route('admin.organization.companies.index'))->assertOk();
-        $this->actingAs($user)->get(route('admin.organization.companies.create'))->assertForbidden();
         $this->actingAs($user)->post(route('admin.organization.companies.store'), [
             'name' => 'Nope', 'code' => 'NOPE',
         ])->assertForbidden();

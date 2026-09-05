@@ -1,3 +1,11 @@
 @import "variables";
 @import "../../node_modules/bootstrap/scss/bootstrap";
+
+// Override the font path before importing so Vite resolves the woff/woff2
+// url()s to a real relative disk path at build time (and copies them into
+// public/build/assets) instead of the package's own "./fonts" default,
+// which resolves relative to the compiled CSS output and 404s there.
+$bootstrap-icons-font-dir: "../../node_modules/bootstrap-icons/font/fonts";
+@import "../../node_modules/bootstrap-icons/font/bootstrap-icons.scss";
+
 @import "layout";

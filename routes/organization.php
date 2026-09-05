@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'auth.session', 'mfa.superadmin'])
     ->prefix('admin/organization')->name('admin.organization.')->group(function () {
-        Route::resource('companies', CompanyController::class)->except('show');
+        Route::resource('companies', CompanyController::class)->except(['show', 'create', 'edit']);
         Route::resource('branches', BranchController::class)->except('show');
         Route::resource('locations', LocationController::class)->except('show');
         Route::resource('divisions', DivisionController::class)->except('show');

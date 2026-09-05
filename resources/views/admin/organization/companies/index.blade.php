@@ -8,7 +8,7 @@
     <x-admin.org-subnav active="companies" />
 
     <x-admin.resource-index
-        :create-url="auth()->user()->can('organization.manage') ? route('admin.organization.companies.create') : null"
+        :create-modal="auth()->user()->can('organization.manage') ? 'createCompanyModal' : null"
         create-label="Add company"
         error-key="company"
     >
@@ -26,7 +26,7 @@
                 <tr>
                     <td>
                         @can('organization.manage')
-                            <a href="{{ route('admin.organization.companies.edit', $company) }}">{{ $company->name }}</a>
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#editCompanyModal{{ $company->id }}">{{ $company->name }}</a>
                         @else
                             {{ $company->name }}
                         @endcan
@@ -42,7 +42,7 @@
                     </td>
                     <td class="text-end">
                         @can('organization.manage')
-                            <a href="{{ route('admin.organization.companies.edit', $company) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editCompanyModal{{ $company->id }}">Edit</button>
                             <form method="POST" action="{{ route('admin.organization.companies.destroy', $company) }}" class="d-inline"
                                   onsubmit="return confirm('Delete {{ $company->name }}? This cannot be undone.');">
                                 @csrf
@@ -61,4 +61,17 @@
     </x-admin.resource-index>
 
     <div class="mt-3">{{ $companies->links() }}</div>
+
+    @can('organization.manage')
+        <x-admin.form-modal id="createCompanyModal" title="Add company" :action="route('admin.organization.companies.store')" submit-label="Create company">
+            @include('admin.organization.companies._form-fields', ['company' => null])
+        </x-admin.form-modal>
+
+        @foreach ($companies as $company)
+            <x-admin.form-modal :id="'editCompanyModal'.$company->id" title="Edit {{ $company->name }}"
+                :action="route('admin.organization.companies.update', $company)" method="PUT" submit-label="Save company">
+                @include('admin.organization.companies._form-fields')
+            </x-admin.form-modal>
+        @endforeach
+    @endcan
 @endsection

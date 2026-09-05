@@ -15,6 +15,16 @@
     flex-shrink: 0;
     border-right: 1px solid var(--bs-border-color);
     overflow-y: auto;
+    transition: width 0.15s ease;
+}
+
+.app-sidebar .nav-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#sidebar-collapse-toggle .bi {
+    transition: transform 0.15s ease;
 }
 
 .app-sidebar .nav-link {
@@ -69,5 +79,26 @@
         position: sticky;
         top: 0;
         height: 100vh;
+    }
+
+    // Collapse-to-icons — desktop only; the mobile offcanvas always shows
+    // full labels since it's already hidden until explicitly opened.
+    // Toggled by resources/js/sidebar-collapse.js via a `data-sidebar`
+    // attribute on <html>, matching the `data-bs-theme` convention.
+    [data-sidebar="collapsed"] .app-sidebar {
+        width: $sidebar-width-collapsed;
+    }
+
+    [data-sidebar="collapsed"] .app-sidebar .nav-label,
+    [data-sidebar="collapsed"] .app-sidebar .nav-section-title {
+        display: none;
+    }
+
+    [data-sidebar="collapsed"] .app-sidebar .nav-link {
+        justify-content: center;
+    }
+
+    [data-sidebar="collapsed"] #sidebar-collapse-toggle .bi {
+        transform: rotate(180deg);
     }
 }

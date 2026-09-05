@@ -29,7 +29,6 @@ class AuthorizationTest extends TestCase
         $superadmin->assignRole(DefaultRole::Superadmin->value);
 
         $this->actingAs($superadmin)->get(route('admin.organization.companies.index'))->assertOk();
-        $this->actingAs($superadmin)->get(route('admin.organization.companies.create'))->assertOk();
         $this->actingAs($superadmin)->get(route('admin.organization.positions.index'))->assertOk();
         $this->actingAs($superadmin)->get(route('admin.organization.job-levels.create'))->assertOk();
     }
@@ -51,7 +50,9 @@ class AuthorizationTest extends TestCase
 
         foreach ([$hrAdmin, $hrStaff] as $user) {
             $this->actingAs($user)->get(route('admin.organization.companies.index'))->assertOk();
-            $this->actingAs($user)->get(route('admin.organization.companies.create'))->assertForbidden();
+            $this->actingAs($user)->post(route('admin.organization.companies.store'), [
+                'name' => 'Nope', 'code' => 'NOPE',
+            ])->assertForbidden();
         }
     }
 }
