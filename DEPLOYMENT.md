@@ -162,6 +162,32 @@ The real build-and-run test happens the first time
 such restriction -- watch that run before trusting the image in
 production.
 
+**Testing the real MySQL + Redis path locally, before trusting it
+anywhere real**: `docker-compose.yml` (repo root) runs the image above
+plus MySQL and Redis containers of their own -- copy
+`.env.docker-compose.example` to `.env.docker-compose` (deliberately
+not `.env`; see that file's own header for why that name specifically
+would collide with this repo's real local-dev file), generate a real
+`APP_KEY` (`docker compose run --rm app php artisan key:generate
+--show`, paste it in), then `docker compose up --build`. This is not a
+replacement for the SQLite-fallback local dev CLAUDE.md's Stack
+section already documents (`php artisan serve` + `npm run dev`, no
+Docker needed) -- it exists specifically to exercise the MySQL/Redis
+path that fallback never touches. Structurally validated with `docker
+compose config` (no image pull needed for that) rather than a real
+`up`, for the same Docker Hub reason as the image itself -- and that
+validation caught a real bug on the first pass: an earlier version of
+this file named the target `.env`, and `docker compose config`'s
+resolved output came back holding this *repo's own real local-dev
+values* (SQLite, 127.0.0.1) instead of anything from
+`.env.docker-compose.example`, because Compose's `env_file:` directive
+resolves strictly from the literal filename given, unrelated to the
+`--env-file` flag used to check it -- it had silently found and loaded
+this project's actual `.env` instead. Renaming the target removed the
+collision outright; re-running the same `config` check afterward
+confirmed the fix (`DB_HOST: mysql`, `REDIS_HOST: redis`, matching the
+compose file's own service names, not the old values).
+
 ## Automated deployment via GitHub Actions
 
 Two workflows, both added alongside the Dockerfile above and both

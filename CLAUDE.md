@@ -383,14 +383,17 @@ file is a summary, not a substitute) before extending any area further.
   request actually touched. Blueprint §27 is now built end-to-end. See
   Workflow below.
 
-- Addendum (not a blueprint phase) — a `Dockerfile` and two GitHub
-  Actions workflows (`docker-publish.yml`, `deploy.yml`) were added
-  after Phase 20, in direct response to a question about deploying
-  this app via GitHub. Both workflows are inert until their secrets are
-  configured. Not build-verified in the authoring session — this
-  sandbox's own egress policy blocks Docker Hub — so the real
-  verification happens the first time `docker-publish.yml` runs on
-  GitHub's own infrastructure. See the end of "Production, Backup &
+- Addendum (not a blueprint phase) — a `Dockerfile`, `docker-compose.yml`
+  (plus `.env.docker-compose.example`), and two GitHub Actions
+  workflows (`docker-publish.yml`, `deploy.yml`) were added after Phase
+  20, in direct response to a question about deploying this app via
+  GitHub. Both workflows are inert until their secrets are configured.
+  Not build-verified in the authoring session — this sandbox's own
+  egress policy blocks Docker Hub — so the real verification happens
+  the first time `docker-publish.yml` runs on GitHub's own
+  infrastructure; `docker compose config` (no image pull needed) did
+  catch one real bug in the compose file, fixed the same session. See
+  the end of "Production, Backup &
   Disaster Recovery" below and DEPLOYMENT.md for the full detail.
 
 ## Authentication
@@ -2926,9 +2929,21 @@ proxy's own status endpoint as an explicit policy denial, not a
 fixable local issue), so the Dockerfile was confirmed to parse and
 stage correctly but never actually built end to end; that real
 verification happens the first time `docker-publish.yml` runs on
-GitHub's own unrestricted infrastructure. See DEPLOYMENT.md's
-"Container deployment" and "Automated deployment via GitHub Actions"
-sections for the full detail this paragraph summarizes.
+GitHub's own unrestricted infrastructure. Also added:
+`docker-compose.yml` plus `.env.docker-compose.example`, so anyone
+with real Docker Hub access can exercise the actual MySQL + Redis path
+locally before trusting the image anywhere real -- structurally
+validated with `docker compose config` (needs no image pull), which
+caught a real bug on its first run: naming the target env file `.env`
+silently collided with this repo's own real local-dev `.env`
+(Compose's `env_file:` resolves that literal filename regardless of
+the unrelated `--env-file` flag used to check it), so the resolved
+config came back holding this project's SQLite-dev values instead of
+anything from the new example file. Renamed the target to
+`.env.docker-compose` and confirmed the fix by re-running the same
+check. See DEPLOYMENT.md's "Container deployment" and "Automated
+deployment via GitHub Actions" sections for the full detail this
+paragraph summarizes.
 
 ## Reports (Phase 19, complete)
 

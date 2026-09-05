@@ -1,0 +1,88 @@
+# Local-only: exercises this app's real MySQL + Redis production path
+# against the actual image the Dockerfile builds, rather than the
+# SQLite/database-driver fallback CLAUDE.md's Stack section documents
+# for bare local dev (`php artisan serve` + `npm run dev`, no Docker
+# needed at all -- that path is still the fastest one for day-to-day
+# work and this file is not trying to replace it). Copy
+# .env.docker-compose.example to .env.docker-compose first (see that
+# file's own header for the one manual step -- generating a real
+# APP_KEY -- it can't do for you), then `docker compose up --build`.
+#
+# Deliberately NOT named .env: this repo already has (or will have) a
+# real local-dev .env at the same path, per the Commands section in
+# CLAUDE.md (`cp .env.example .env`, SQLite/database-driver
+# defaults) -- env_file: .env here would silently pick that file up
+# instead of this stack's own MySQL/Redis service-name-based config,
+# which is exactly what happened once already while writing this file
+# (see below).
+#
+# Not run in the session that wrote it, for the same reason the
+# Dockerfile itself wasn't: this sandbox's egress policy blocks Docker
+# Hub, and `mysql`/`redis` below are official Docker Hub images.
+# `docker compose config` validated the file's structure without
+# needing to pull anything -- and caught a real bug doing it: an
+# earlier version of this file used `env_file: .env`, and config's
+# resolved output came back with this project's actual local
+# SQLite-dev values (DB_CONNECTION: sqlite, REDIS_HOST: 127.0.0.1,
+# ...) instead of anything from .env.docker-compose.example, because
+# `docker compose config`'s own `--env-file` flag only affects
+# variable substitution *inside* this YAML file, not which file an
+# `env_file:` directive inside a service loads -- that's resolved
+# purely from the literal path given, which was silently colliding
+# with this repo's own real, already-present .env. Renaming the target
+# to .env.docker-compose removed the collision entirely rather than
+# working around it.
+
+services:
+  app:
+    build: .
+    command: ["web"]
+    ports:
+      - "8080:8080"
+    env_file: .env.docker-compose
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["worker"]
+    env_file: .env.docker-compose
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: hris
+      MYSQL_USER: hris
+      MYSQL_PASSWORD: hris
+      # Nothing in this stack ever connects as root -- a random,
+      # unknown, unpersisted root password (printed once to this
+      # container's own logs and never needed again) is a safer
+      # default than leaving root passwordless, and needs no extra
+      # setup step either.
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uhris", "-phris"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mysql-data:
+  redis-data:
