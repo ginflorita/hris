@@ -2945,6 +2945,40 @@ check. See DEPLOYMENT.md's "Container deployment" and "Automated
 deployment via GitHub Actions" sections for the full detail this
 paragraph summarizes.
 
+**A second real bug, found while verifying the above on live GitHub
+Actions rather than only in this sandbox: `tests.yml`'s `PHP 8.3` job
+had been failing on `main` since long before this addendum, unrelated
+to anything it added.** `composer.json` declares `"php": "^8.3"` but
+never pinned `config.platform.php`, so every `composer update` run in
+this sandbox (whose actual interpreter is PHP 8.4) silently resolved
+and locked several transitive packages — `symfony/clock`,
+`css-selector`, `event-dispatcher`, `property-access`, `property-info`,
+`serializer`, `string`, `translation`, `type-info` (all pulled in via
+`web-auth/webauthn-lib`, itself a transitive dependency of `laravel/
+fortify`'s WebAuthn support), plus `web-auth/webauthn-lib` 5.3.6 itself
+— to versions requiring `php >=8.4.1`, silently drifting `composer.lock`
+past the project's own declared 8.3 floor with nothing to catch it
+locally (this sandbox never runs the CI matrix's PHP 8.3 leg). Confirmed
+pre-existing and identical on three historical `main` runs, including
+`main`'s own current HEAD at the time, via `get_job_logs` — not
+something introduced by whichever PR happened to surface it. Fixed by
+adding `"config": {"platform": {"php": "8.3.33"}}` to `composer.json`
+(pinning dependency *resolution* to the declared floor regardless of
+whichever PHP version actually runs `composer update`, so this can't
+silently drift again) and regenerating the lock: the affected Symfony
+packages downgraded to their 8.2+-compatible 7.4.x line and
+`web-auth/webauthn-lib` moved to 5.3.8, with a handful of small
+transitive version bumps composer pulled in to satisfy that graph — zero
+packages added or removed. Verified by a from-scratch `rm -rf vendor &&
+composer install --prefer-dist --no-interaction --no-progress`
+(reproducing `tests.yml`'s exact step) succeeding cleanly, plus the full
+478-test suite and Pint both still passing. Worth remembering: a
+`composer.json` `"php"` constraint alone only describes the *range* the
+app claims to support — nothing stops `composer update`, run on any
+single machine within that range, from locking transitive packages that
+only work on the *newer* end of it unless `config.platform.php` pins
+resolution to the floor.
+
 ## Reports (Phase 19, complete)
 
 Blueprint §3 lists eight report/analytics modules (items 53-60: HR,
